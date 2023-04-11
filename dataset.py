@@ -1,0 +1,93 @@
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+
+import numpy as np
+import os
+import torch
+import torchvision.transforms as transforms
+
+class SampledDataset(Dataset):
+
+	def __init__(self, data_dir = "./data", split = "unlabeled", start_frame = 0, sample_frames = 11, distance = 11, transform = transforms.ToTensor()):
+		self.data_dir 		= data_dir
+		self.split 			= split 		# train/unlabeled/val/test
+		self.path 			= os.path.join(self.data_dir, self.split)
+		self.start_frame	= start_frame	# If not test split, then we sample this value from [0, 10]
+		self.sample_frames	= sample_frames # FIX THIS - FOR NOW ALWAYS USING 11 FRAMES
+		self.distance 		= distance 		# If not test split, then we sample this value between [1, 11]
+		self.transform 		= transform
+
+		self.video_ids 		= sorted([v for v in os.listdir(self.path) if os.path.isdir(os.path.join(self.path, v))])
+		self.video_ids 		= self.video_ids[:2]
+
+	def __len__(self):
+		return len(self.video_ids)
+
+	def _load_image(self, image_path):
+		image 			= Image.open(image_path)
+		image 			= self.transform(image) if self.transform is not None else image
+
+		return image
+
+	def __getitem__(self, index):
+		video_id 		= self.video_ids[index]
+		video_path 		= os.path.join(self.path, video_id)
+		mask_path 		= os.path.join(video_path, "mask.npy")
+
+		# Sample start frame from the first 11 frames if not test
+		start_index		= np.random.randint(0, 11) if self.split != 'test' else self.start_frame
+
+		# Get consecutive sample_frames number of frames
+		input_images 	= []
+		input_frames 	= []
+		for index in range(start_index, start_index + self.sample_frames):
+			image 		= self._load_image(os.path.join(video_path, f"image_{index}.png"))
+			input_images.append(image)
+			input_frames.append(index)
+		input_images 	= torch.stack(input_images, dim = 0)
+		input_frames 	= torch.tensor(input_frames)
+
+		# Sample the frame to predict at some distance if not test
+		end_index 		= start_index + (self.sample_frames - 1)
+		pred_index 		= np.random.randint(end_index + 1, 22) if self.split != 'test' else end_index + self.distance
+
+		pred_image 		= self._load_image(os.path.join(video_path, f"image_{pred_index}.png"))
+		pred_frame		= torch.tensor([pred_index])
+
+		# Extract input and prediction mask
+		mask 			= torch.FloatTensor(np.load(mask_path)) if os.path.exists(mask_path) else \
+							torch.zeros((22, 160, 240))
+							# torch.zeros((22, input_images.shape[2], input_images.shape[3]))
+							# FIX THIS - SHOULD WE RESIZE THE MASK TO 224,224? DON'T THINK SO. HARDCODING THE VALUE FOR NOW
+		input_mask 		= mask[input_frames]
+		pred_mask 		= mask[pred_frame]
+
+		instance 		= {
+			"video_id": 	video_id,
+
+			"input_images": input_images.unsqueeze(0),
+			"input_frames": input_frames.unsqueeze(0),
+			"input_mask":	input_mask.unsqueeze(0),
+
+			"pred_image": 	pred_image.unsqueeze(0),
+			"pred_frame": 	pred_frame.unsqueeze(0),
+			"pred_mask": 	pred_mask.unsqueeze(0),
+		}
+
+		return instance
+
+def collate_fn(data):
+	tensor_items 	= ["input_images", "input_frames", "input_mask", "pred_image", "pred_frame", "pred_mask"]
+	batch 			= {k: [d[k] for d in data] for k in data[0].keys()}
+
+	if len(data) == 1:
+		for k,v in batch.items():
+			if k in tensor_items:
+				batch[k] = torch.cat(batch[k], 0)
+			else:
+				batch[k] = batch[k][0]
+	else:
+		for k in tensor_items:
+			batch[k] = torch.cat(batch[k], 0)
+
+	return batch
