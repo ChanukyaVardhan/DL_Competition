@@ -53,13 +53,13 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 	num_samples 	= 0
 
 	for i, batch in enumerate(train_loader):
-		input_images 	= batch["input_images"]
-		input_frames 	= batch["input_frames"]
-		pred_image 		= batch["pred_image"]
-		pred_frame 		= batch["pred_frame"]
+		input_images 	= batch["input_images"].to(device)
+		input_frames 	= batch["input_frames"].to(device)
+		pred_image 		= batch["pred_image"].to(device)
+		pred_frame 		= batch["pred_frame"].to(device)
 		if not params["is_pretrain"]:
-			input_mask	= batch["input_mask"]
-			pred_mask	= batch["pred_mask"]
+			input_mask	= batch["input_mask"].to(device)
+			pred_mask	= batch["pred_mask"].to(device)
 		batch_size 		= pred_image.shape[0]
 
 		optimizer.zero_grad()
@@ -88,13 +88,13 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 	num_samples 	= 0
 
 	for i, batch in enumerate(eval_loader):
-		input_images 	= batch["input_images"]
-		input_frames 	= batch["input_frames"]
-		pred_image 		= batch["pred_image"]
-		pred_frame 		= batch["pred_frame"]
+		input_images 	= batch["input_images"].to(device)
+		input_frames 	= batch["input_frames"].to(device)
+		pred_image 		= batch["pred_image"].to(device)
+		pred_frame 		= batch["pred_frame"].to(device)
 		if not params["is_pretrain"]:
-			input_mask	= batch["input_mask"]
-			pred_mask	= batch["pred_mask"]
+			input_mask	= batch["input_mask"].to(device)
+			pred_mask	= batch["pred_mask"].to(device)
 		batch_size 		= pred_image.shape[0]
 
 		if params["is_pretrain"]:
@@ -165,7 +165,7 @@ if __name__ == "__main__":
 		# FIX WITH DATA AUGMENTATIONS
 		transforms.ToTensor(),
 		# FIX WITH APPROPRIATE MEAN AND STD VALUES
-		# transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+		transforms.Normalize(mean = [0.5061, 0.5045, 0.5008], std = [0.0571, 0.0567, 0.0614])
 	])
 
 	# Datasets

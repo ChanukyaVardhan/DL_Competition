@@ -19,6 +19,6 @@ num_workers:        4               # Number of workers for data loader
 # training
 seed:               43              # Random Seed
 num_epochs:         2               # Number of epochs
-resume_training:   False            # Resume Training
+resume_training:    False           # Resume Training
 optimizer:          "adam"          # Optimizer
 lr:                 0.001           # Learning Rate
