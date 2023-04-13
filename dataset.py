@@ -50,7 +50,12 @@ class SampledDataset(Dataset):
 
 		# Sample the frame to predict at some distance if not test
 		end_index 		= start_index + (self.sample_frames - 1)
-		pred_index 		= np.random.randint(end_index + 1, 22) if self.split != 'test' else end_index + self.distance
+		if self.split != 'test':
+			pred_index	= np.random.randint(end_index + 1, 22)
+			pred_dist	= pred_index - end_index
+		else:
+			pred_dist	= self.distance
+			pred_index	= end_index + pred_dist
 
 		pred_image 		= self._load_image(os.path.join(video_path, f"image_{pred_index}.png"))
 		pred_frame		= torch.tensor([pred_index])
@@ -64,24 +69,23 @@ class SampledDataset(Dataset):
 		pred_mask 		= mask[pred_frame]
 
 		instance 		= {
-			"video_id": 	video_id,
+			"video_id": 	video_id,									# Video Id
 
-			# FIX - CHANGE INPUT FRAMES AND PRED FRAME TO 0-10 and d
-			"input_images": input_images.unsqueeze(0),
-			"input_frames": input_frames.unsqueeze(0),
-			"input_mask":	input_mask.unsqueeze(0),
+			"input_images": input_images.unsqueeze(0),					# Input x images
+			"input_frames": input_frames.unsqueeze(0),					# Frame indexes of the input x frames
+			"start_frame": 	torch.tensor([start_index]).unsqueeze(0),	# Start frame index of the input x
+			"input_mask":	input_mask.unsqueeze(0),					# Segmentation mask of the input x
 
-			"pred_image": 	pred_image.unsqueeze(0),
-			"pred_frame": 	pred_frame.unsqueeze(0),
-			"pred_mask": 	pred_mask.unsqueeze(0),
-
-			# FIX - ADD OFFSET
+			"pred_image": 	pred_image.unsqueeze(0),					# Image y
+			"pred_frame": 	pred_frame.unsqueeze(0),					# Frame index of y
+			"pred_dist":	torch.tensor([pred_dist]).unsqueeze(0),		# Distance of y from the end of x frames that we are predicting
+			"pred_mask": 	pred_mask.unsqueeze(0),						# Segmentation mask of y
 		}
 
 		return instance
 
 def collate_fn(data):
-	tensor_items 	= ["input_images", "input_frames", "input_mask", "pred_image", "pred_frame", "pred_mask"]
+	tensor_items 	= ["input_images", "input_frames", "start_frame", "input_mask", "pred_image", "pred_frame", "pred_dist", "pred_mask"]
 	batch 			= {k: [d[k] for d in data] for k in data[0].keys()}
 
 	if len(data) == 1:

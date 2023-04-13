@@ -37,7 +37,7 @@ class PreTrainModel(nn.Module):
 		else:
 			raise Exception(f'{cnn_encoder} is not a valid CNN encoder!')
 
-	def forward(self, input_images, input_frames, pred_image, pred_frame):
+	def forward(self, input_images, input_frames, start_frame, pred_image, pred_frame):
 		B, Nf, C, H, W 		= input_images.shape
 		# input_images: B x Nf x 3 x 224 x 224 -> input_images_: B*Nf x 3 x 224 x 224
 		input_images_ 		= input_images.reshape(B*Nf, C, H, W)
@@ -50,7 +50,7 @@ class PreTrainModel(nn.Module):
 
 		x 					= self.positional_encoding(
 			torch.cat([x_encoding, pred_image_enc], dim = 1),
-			torch.cat([input_frames, pred_frame], dim = 1)
+			torch.cat([input_frames - start_frame, pred_frame - start_frame], dim = 1) # Subtracting start_frame so transformer sees this without offset
 		)
 
 		# x_encoding_pred: B x d_emb

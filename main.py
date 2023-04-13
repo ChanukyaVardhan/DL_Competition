@@ -58,6 +58,7 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 	for i, batch in enumerate(train_loader):
 		input_images 	= batch["input_images"].to(device)
 		input_frames 	= batch["input_frames"].to(device)
+		start_frame 	= batch["start_frame"].to(device)
 		pred_image 		= batch["pred_image"].to(device)
 		pred_frame 		= batch["pred_frame"].to(device)
 		if not params["is_pretrain"]:
@@ -68,7 +69,7 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 		optimizer.zero_grad()
 
 		if params["is_pretrain"]:
-			x_encoding, x_encoding_pred, y_encoding = model(input_images, input_frames, pred_image, pred_frame)
+			x_encoding, x_encoding_pred, y_encoding = model(input_images, input_frames, start_frame, pred_image, pred_frame)
 			loss 		= criterion(x_encoding, x_encoding_pred, y_encoding)
 		else:
 			raise Exception("Not implemented Yet!")
@@ -93,6 +94,7 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 	for i, batch in enumerate(eval_loader):
 		input_images 	= batch["input_images"].to(device)
 		input_frames 	= batch["input_frames"].to(device)
+		start_frame 	= batch["start_frame"].to(device)
 		pred_image 		= batch["pred_image"].to(device)
 		pred_frame 		= batch["pred_frame"].to(device)
 		if not params["is_pretrain"]:
@@ -101,7 +103,7 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 		batch_size 		= pred_image.shape[0]
 
 		if params["is_pretrain"]:
-			x_encoding, x_encoding_pred, y_encoding = model(input_images, input_frames, pred_image, pred_frame)
+			x_encoding, x_encoding_pred, y_encoding = model(input_images, input_frames, start_frame, pred_image, pred_frame)
 			loss 		= criterion(x_encoding, x_encoding_pred, y_encoding)
 		else:
 			raise Exception("Not implemented Yet!")
