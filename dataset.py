@@ -18,7 +18,8 @@ class SampledDataset(Dataset):
 		self.transform 		= transform
 
 		self.video_ids 		= sorted([v for v in os.listdir(self.path) if os.path.isdir(os.path.join(self.path, v))])
-		self.video_ids 		= self.video_ids[:2]
+		# FIX - UNCOMMENT THIS TO RUN LOCALLY
+		# self.video_ids 		= self.video_ids[:2]
 
 	def __len__(self):
 		return len(self.video_ids)
@@ -65,6 +66,7 @@ class SampledDataset(Dataset):
 		instance 		= {
 			"video_id": 	video_id,
 
+			# FIX - CHANGE INPUT FRAMES AND PRED FRAME TO 0-10 and d
 			"input_images": input_images.unsqueeze(0),
 			"input_frames": input_frames.unsqueeze(0),
 			"input_mask":	input_mask.unsqueeze(0),
@@ -72,6 +74,8 @@ class SampledDataset(Dataset):
 			"pred_image": 	pred_image.unsqueeze(0),
 			"pred_frame": 	pred_frame.unsqueeze(0),
 			"pred_mask": 	pred_mask.unsqueeze(0),
+
+			# FIX - ADD OFFSET
 		}
 
 		return instance

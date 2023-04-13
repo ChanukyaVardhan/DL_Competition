@@ -4,11 +4,14 @@ from torch.utils.data import ConcatDataset, DataLoader
 
 import argparse
 import json
+import numpy as np
 import os
+import random
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 import yaml
+import wandb
 
 def get_parameters():
 	parser 	= argparse.ArgumentParser()
@@ -65,8 +68,8 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 		optimizer.zero_grad()
 
 		if params["is_pretrain"]:
-			x_encoding, y_encoding = model(input_images, input_frames, pred_image, pred_frame)
-			loss 		= criterion(x_encoding, y_encoding)
+			x_encoding, x_encoding_pred, y_encoding = model(input_images, input_frames, pred_image, pred_frame)
+			loss 		= criterion(x_encoding, x_encoding_pred, y_encoding)
 		else:
 			raise Exception("Not implemented Yet!")
 
@@ -98,8 +101,8 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 		batch_size 		= pred_image.shape[0]
 
 		if params["is_pretrain"]:
-			x_encoding, y_encoding = model(input_images, input_frames, pred_image, pred_frame)
-			loss 		= criterion(x_encoding, y_encoding)
+			x_encoding, x_encoding_pred, y_encoding = model(input_images, input_frames, pred_image, pred_frame)
+			loss 		= criterion(x_encoding, x_encoding_pred, y_encoding)
 		else:
 			raise Exception("Not implemented Yet!")
 
@@ -132,6 +135,7 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 		eval_loss 	= eval_epoch(model, criterion, eval_loader, device, params)
 
 		print(f"Training Loss - {train_loss:.4f}, Eval Loss - {eval_loss:.4f}")
+		wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss})
 		
 		train_stats["epoch"].append(epoch)
 		train_stats["train_loss"].append(train_loss)
@@ -153,12 +157,19 @@ if __name__ == "__main__":
 	params = get_parameters()
 
 	# Set seed
+	np.random.seed(params["seed"])
+	random.seed(params["seed"])
 	torch.manual_seed(params["seed"])
 	torch.cuda.manual_seed_all(params["seed"])
 	torch.backends.cudnn.benchmark = False
 	torch.backends.cudnn.deterministic = True
 
 	device	= torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+	wandb.init(
+		project = "dl_competition",
+		config = params,
+	)
 
 	transform = transforms.Compose([
 		transforms.Resize((224, 224)),
@@ -174,7 +185,7 @@ if __name__ == "__main__":
 		train_dataset 	= ConcatDataset([
 							SampledDataset(data_dir = params["data_dir"], split = "unlabeled", transform = transform),
 							SampledDataset(data_dir = params["data_dir"], split = "train", transform = transform),
-						])		
+						])	
 		eval_dataset 	= SampledDataset(data_dir = params["data_dir"], split = "val", transform = transform)
 	else:
 		raise Exception("Not implemented Yet!")
@@ -214,3 +225,5 @@ if __name__ == "__main__":
 
 	# Training
 	train_model(model, optimizer, criterion, train_loader, eval_loader, device, params)
+
+	wandb.finish()

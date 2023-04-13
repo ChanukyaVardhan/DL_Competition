@@ -25,6 +25,7 @@ pred_frame = batch["pred_frame"]
 # pretrainmodel = PreTrainModel(cnn_encoder = "resnet50", d_emb = 2048, d_ff = 2048, n_heads = 2, n_layers = 3, dropout = 0.)
 # pretrainmodel = PreTrainModel(cnn_encoder = "resnet34", d_emb = 512, d_ff = 2048, n_heads = 2, n_layers = 3, dropout = 0.)
 pretrainmodel = PreTrainModel(cnn_encoder = "resnet18", d_emb = 512, d_ff = 2048, n_heads = 2, n_layers = 3, dropout = 0.)
-x_encoding, y_encoding = pretrainmodel(input_images, input_frames, pred_image, pred_frame)
+x_encoding, x_encoding_pred, y_encoding = pretrainmodel(input_images, input_frames, pred_image, pred_frame)
 print("x_encoding - ", x_encoding.shape)
+print("x_encoding - ", x_encoding_pred.shape)
 print("y_encoding - ", y_encoding.shape)
