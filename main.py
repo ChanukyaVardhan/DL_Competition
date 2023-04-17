@@ -38,6 +38,8 @@ def get_existing_stats(train_stat_path, start_epoch, params):
 		"epoch": 		[],
 		"train_loss": 	[],
 		"eval_loss":	[],
+		"train_acc":	[],
+		"eval_acc":		[],
 		# FIX THIS - ADD OTHER METRICS?
 	}
 
@@ -53,6 +55,7 @@ def get_existing_stats(train_stat_path, start_epoch, params):
 def train_epoch(model, optimizer, criterion, train_loader, device, params):
 	model.train()
 	train_loss 		= 0.0
+	train_accuracy 	= 0.0
 	num_samples 	= 0
 
 	for i, batch in enumerate(train_loader):
@@ -76,19 +79,22 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 
 		train_loss 	   += loss.item()
 		# FIX THIS - COMPUTE ACCURACY HERE?
-
+		cos 			= nn.CosineSimilarity(dim=1, eps=1e-6)
+		train_accuracy += cos(x_encoding_pred, y_encoding)
 		loss.backward()
 		optimizer.step()
 
 		num_samples    += batch_size
 
 	train_loss /= num_samples
+	train_accuracy  /= num_samples
 
-	return train_loss
+	return train_loss, train_accuracy
 
 def eval_epoch(model, criterion, eval_loader, device, params):
 	model.eval()
 	eval_loss 		= 0.0
+	eval_accuracy 	= 0.0
 	num_samples 	= 0
 
 	for i, batch in enumerate(eval_loader):
@@ -110,12 +116,15 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 
 		eval_loss 	   += loss.item()
 		# FIX THIS - COMPUTE ACCURACY HERE?
-
+		# FIX THIS - WHAT METRIC? COSINE SIMILARITY?
+		cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+		eval_accuracy  += cos(x_encoding_pred, y_encoding)
 		num_samples    += batch_size
 
 	eval_loss /= num_samples
+	eval_accuracy  /= num_samples
 
-	return eval_loss
+	return eval_loss, eval_accuracy
 
 def train_model(model, optimizer, criterion, train_loader, eval_loader, device, params):
 	model.train()
@@ -133,8 +142,8 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 	for epoch in range(start_epoch, params["num_epochs"] + 1):
 		print(f"Training Epoch - {epoch}")
 
-		train_loss 	= train_epoch(model, optimizer, criterion, train_loader, device, params)
-		eval_loss 	= eval_epoch(model, criterion, eval_loader, device, params)
+		train_loss, train_acc 	= train_epoch(model, optimizer, criterion, train_loader, device, params)
+		eval_loss, eval_acc 	= eval_epoch(model, criterion, eval_loader, device, params)
 
 		print(f"Training Loss - {train_loss:.4f}, Eval Loss - {eval_loss:.4f}")
 		wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss})
@@ -142,6 +151,8 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 		train_stats["epoch"].append(epoch)
 		train_stats["train_loss"].append(train_loss)
 		train_stats["eval_loss"].append(eval_loss)
+		train_stats["train_acc"].append(train_acc)
+		train_stats["eval_acc"].append(eval_acc)
 
 		with open(train_stat_path, "w") as f:
 			json.dump(train_stats, f)
