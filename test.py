@@ -7,7 +7,6 @@ import torchvision.transforms as transforms
 transform = transforms.Compose([
 		transforms.Resize((224, 224)),
 		transforms.ToTensor(),
-		# FIX WITH APPROPRIATE MEAN AND STD VALUES
 		transforms.Normalize(mean = [0.5061, 0.5045, 0.5008], std = [0.0571, 0.0567, 0.0614])
 	])
 
@@ -29,5 +28,5 @@ pred_frame = batch["pred_frame"]
 pretrainmodel = PreTrainModel(cnn_encoder = "resnet18", d_emb = 512, d_ff = 2048, n_heads = 2, n_layers = 3, dropout = 0.)
 x_encoding, x_encoding_pred, y_encoding = pretrainmodel(input_images, input_frames, start_frame, pred_image, pred_frame)
 print("x_encoding - ", x_encoding.shape)
-print("x_encoding - ", x_encoding_pred.shape)
+print("x_encoding_pred - ", x_encoding_pred.shape)
 print("y_encoding - ", y_encoding.shape)

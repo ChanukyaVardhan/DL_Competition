@@ -35,8 +35,11 @@ class SampledDataset(Dataset):
 		video_path 		= os.path.join(self.path, video_id)
 		mask_path 		= os.path.join(video_path, "mask.npy")
 
-		# Sample start frame from the first 11 frames if not test
-		start_index		= np.random.randint(0, 11) if self.split != 'test' else self.start_frame
+		# Sample start frame from the first 11 frames if not test or eval
+		if self.split != 'test' or self.split != 'val':
+			start_index	= np.random.randint(0, 11)
+		else:
+			start_index = self.start_frame
 
 		# Get consecutive sample_frames number of frames
 		input_images 	= []
@@ -48,9 +51,9 @@ class SampledDataset(Dataset):
 		input_images 	= torch.stack(input_images, dim = 0)
 		input_frames 	= torch.tensor(input_frames)
 
-		# Sample the frame to predict at some distance if not test
+		# Sample the frame to predict at some distance if not test or eval
 		end_index 		= start_index + (self.sample_frames - 1)
-		if self.split != 'test':
+		if self.split != 'test' or self.split != 'val':
 			pred_index	= np.random.randint(end_index + 1, 22)
 			pred_dist	= pred_index - end_index
 		else:
