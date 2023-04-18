@@ -20,7 +20,7 @@ class PreTrainModel(nn.Module):
 		self.transformer_encoder 	= transformer.TransformerEncoder(self.d_emb, self.d_ff, self.n_heads, self.n_layers, self.dropout)
 		self.positional_encoding 	= transformer.PositionalEncoding(self.d_emb, self.dropout)
 
-		# DO WE NEED A NON LINEAR ACTIVATION HERE?
+		# FIX - DO WE NEED A NON LINEAR ACTIVATION HERE?
 		self.mlp 					= nn.Linear(self.d_emb, self.d_emb)
 
 	def _get_cnn_encoder(self, cnn_encoder):
@@ -46,7 +46,7 @@ class PreTrainModel(nn.Module):
 		x_encoding 			= input_images_enc.reshape(B, Nf, -1)
 
 		# pred_image_enc: B x 1 x d_emb
-		pred_image_enc 		= nn.Parameter(torch.randn(B, 1, self.d_emb))
+		pred_image_enc 		= nn.Parameter(torch.randn(B, 1, self.d_emb)).to(input_images.device)
 
 		x 					= self.positional_encoding(
 			torch.cat([x_encoding, pred_image_enc], dim = 1),

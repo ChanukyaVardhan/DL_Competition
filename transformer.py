@@ -232,11 +232,11 @@ class PositionalEncoding(nn.Module):
             `encoder input`, shape (batch, len, d_model)
         """
         # B, l(11 + 1), d_model
-        batch_size, l, d_model = x.shape
+        _, _, d_model = x.shape
 
-        pe              = torch.zeros(batch_size, l, d_model)
+        pe              = torch.zeros_like(x)
         pos             = pos.unsqueeze(-1)
-        div_term        = torch.exp(torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model))
+        div_term        = torch.exp(torch.arange(0, d_model, 2, device = x.device).float() * -(math.log(10000.0) / d_model))
         div_term        = div_term.unsqueeze(0).unsqueeze(0)
         pe[:, :, 0::2]  = torch.sin(pos * div_term)
         pe[:, :, 1::2]  = torch.cos(pos * div_term)
