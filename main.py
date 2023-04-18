@@ -127,6 +127,9 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 	return eval_loss, eval_accuracy
 
 def train_model(model, optimizer, criterion, train_loader, eval_loader, device, params):
+	params_with_grad = filter(lambda p: p.requires_grad, model.parameters())
+	params_count = sum([np.prod(p.size()) for p in params_with_grad])
+	print(f"Total number of trainable parameters: {params_count}")
 	model.train()
 
 	start_epoch = 1
