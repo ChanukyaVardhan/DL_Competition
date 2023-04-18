@@ -19,6 +19,8 @@ def get_parameters():
 	parser 	= argparse.ArgumentParser()
 	parser.add_argument("--config_path", default = "config/default.yml", help = "Path to config file.")
 	parser.add_argument("--pretrain",    default = False, action = "store_true", help = "Flag to set pretraining to True.")
+	parser.add_argument("--save_every",  default = False, action = "store_true", help = "Flag to save every few epochs to True.")
+	parser.add_argument("--load_path",   default = "", help = "Override Load the model from this path in the config.")
 	parser.add_argument("--num_epochs",  default = 0, type = int, help = "Number of epochs to override value in the config.")
 	parser.add_argument("--batch_size",  default = 0, type = int, help = "Batch Size to override value in the config.")
 	parser.add_argument("--num_workers", default = 0, type = int, help = "Num workers to override value in the config.")
@@ -29,7 +31,10 @@ def get_parameters():
 		params = yaml.load(f, Loader=yaml.SafeLoader)
 	params["experiment"] 	= os.path.splitext(os.path.basename(args.config_path))[0]
 	params["is_pretrain"]	= args.pretrain
+	params["is_save_every"] = args.save_every
 
+	if args.load_path != "":
+		params["load_path"] = load_path
 	if args.num_epochs != 0:
 		params["num_epochs"] = args.num_epochs
 	if args.batch_size != 0:
@@ -41,31 +46,18 @@ def get_parameters():
 
 	return params
 
-def get_save_paths(params):
+def get_save_paths_prefix(params):
 	prefix 			= f'{params["checkpoint_path"]}/{params["experiment"]}_'
 	if params["is_pretrain"]:
 		prefix += "pretrain_"
+
+	return prefix
+
+def get_save_paths(params):
+	prefix 			= get_save_paths_prefix(params)
+
 	model_path 		= f'{prefix}model.pt'
-	train_stat_path = f'{prefix}stats.json'
-
-	return model_path, train_stat_path
-
-def get_existing_stats(train_stat_path, start_epoch, params):
-	train_stats = {
-		"epoch": 		[],
-		"train_loss": 	[],
-		"eval_loss":	[],
-		# FIX THIS - ADD OTHER METRICS?
-	}
-
-	if params["resume_training"] and os.path.exists(train_stat_path):
-		existing_stats = json.load(open(train_stat_path, "r"))
-
-		for key, val in existing_stats.items():
-			if key in train_stats:
-				train_stats[key] = val[:start_epoch - 1]
-
-	return train_stats
+	return model_path
 
 def get_batch_entries(batch, device):
 	input_images 	= batch["input_images"].to(device)
@@ -134,17 +126,22 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 def train_model(model, optimizer, criterion, train_loader, eval_loader, device, params):
 	model.train()
 
-	start_epoch = 1
-	model_path, train_stat_path = get_save_paths(params)
-	best_eval_loss = float("inf")
-	if params["resume_training"] and os.path.exists(model_path):
-		model_details 	= torch.load(model_path)
+	start_epoch 	= 1
+	best_model_path = get_save_paths(params)
+	best_eval_loss 	= float("inf")
+	if params["resume_training"]:
+		if params["load_path"] != "": # Load the model from this path, it could the best model or form some other epoch
+			model_details 	= torch.load(params["load_path"])
+		elif os.path.exists(best_model_path): # Load from best model path
+			model_details 	= torch.load(best_model_path)
+		else:
+			raise Exception("Can't resume training!")
+
+		model_details 	= torch.load(best_model_path)
 		start_epoch		= model_details["epoch"] + 1 # Start from the epoch after the checkpoint
 		best_eval_loss	= model_details["best_eval_loss"]
 		model.load_state_dict(model_details["model"])
 		optimizer.load_state_dict(model_details["optimizer"])
-
-	train_stats = get_existing_stats(train_stat_path, start_epoch, params)
 
 	for epoch in range(start_epoch, params["num_epochs"] + 1):
 		print(f"Training Epoch - {epoch}")
@@ -163,16 +160,8 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 
 		gc.collect()
 
-		wandb.log({"Epoch": epoch, "Train Loss": train_loss, "Eval Loss": eval_loss, "Train Time": train_time, "Eval Time": eval_time})
-		
-		train_stats["epoch"].append(epoch)
-		train_stats["train_loss"].append(train_loss)
-		train_stats["eval_loss"].append(eval_loss)
+		wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss, "Train Time": train_time, "Eval Time": eval_time})
 
-		with open(train_stat_path, "w") as f:
-			json.dump(train_stats, f)
-
-		# FIX THIS - SAVE MODEL AND OPTIMIZER ON SOME CONDITION, ALSO SAVE THE CONDITION IN THE PATH AS WELL
 		if eval_loss < best_eval_loss:
 			best_eval_loss = eval_loss
 			print(f"Saving model with best eval loss - {best_eval_loss:.4f}")
@@ -181,7 +170,19 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 				"best_eval_loss":	best_eval_loss,
 				"model": 			model.state_dict(),
 				"optimizer":		optimizer.state_dict()
-			}, model_path)
+			}, best_model_path)
+
+		# Save model after every few epochs
+		if params["is_save_every"] and (epoch % params["save_every"] == 0):
+			prefix 		= get_save_paths_prefix(params)
+			epoch_path 	= f'{prefix}model_{epoch}.pt'
+			print(f"Saving model at epoch - {epoch}")
+			torch.save({
+				"epoch": 			epoch,
+				"best_eval_loss":	best_eval_loss,
+				"model": 			model.state_dict(),
+				"optimizer":		optimizer.state_dict()
+			}, epoch_path)
 
 	return model
 
