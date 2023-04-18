@@ -131,13 +131,14 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 	best_eval_loss 	= float("inf")
 	if params["resume_training"]:
 		if params["load_path"] != "": # Load the model from this path, it could the best model or form some other epoch
-			model_details 	= torch.load(params["load_path"])
+			load_path = params["load_path"]
 		elif os.path.exists(best_model_path): # Load from best model path
-			model_details 	= torch.load(best_model_path)
+			load_path = params[best_model_path]
 		else:
 			raise Exception("Can't resume training!")
 
-		model_details 	= torch.load(best_model_path)
+		print(f"Loading model from - {load_path}")
+		model_details 	= torch.load(load_path)
 		start_epoch		= model_details["epoch"] + 1 # Start from the epoch after the checkpoint
 		best_eval_loss	= model_details["best_eval_loss"]
 		model.load_state_dict(model_details["model"])
