@@ -1,0 +1,22 @@
+# model
+checkpoint_path:    "checkpoints"   # Model checkpoint path
+is_pretrain:        True            # Falg to decide pretraining
+cnn_encoder:        "resnet18"      # CNN Encoder for each image frame
+n_layers:           6               # Number of transformer layers
+dropout:            0.              # Dropout value
+
+
+# data
+data_dir:           "/vast/snm6477/DL_Finals/Dataset_Student"        # Data directory
+batch_size:         64               # Batch size
+num_workers:        4               # Number of workers for data loader
+num_classes:        49
+
+# training
+seed:               43              # Random Seed
+num_epochs:         2             # Number of epochs
+resume_training:    False           # Resume Training
+load_path:          ""              # Load saved model from this path
+optimizer:          "adam"          # Optimizer
+save_every:         10              # Save the model after every few epochs
+lr:                 6e-5           # Learning Rate

@@ -37,7 +37,7 @@ class SampledDataset(Dataset):
 		mask_path 		= os.path.join(video_path, "mask.npy")
 
 		# Sample start frame from the first 11 frames if not test or eval
-		if self.split != 'test' or self.split != 'val':
+		if self.split != 'test' and self.split != 'val':
 			start_index	= np.random.randint(0, 11)
 		else:
 			start_index = self.start_frame
@@ -54,7 +54,7 @@ class SampledDataset(Dataset):
 
 		# Sample the frame to predict at some distance if not test or eval
 		end_index 		= start_index + (self.sample_frames - 1)
-		if self.split != 'test' or self.split != 'val':
+		if self.split != 'test' and self.split != 'val':
 			pred_index	= np.random.randint(end_index + 1, 22)
 			pred_dist	= pred_index - end_index
 		else:

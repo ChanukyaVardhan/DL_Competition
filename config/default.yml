@@ -19,5 +19,7 @@ num_workers:        6               # Number of workers for data loader
 seed:               43              # Random Seed
 num_epochs:         100             # Number of epochs
 resume_training:    False           # Resume Training
+load_path:          ""              # Load saved model from this path
 optimizer:          "adam"          # Optimizer
 lr:                 0.001           # Learning Rate
+save_every:         10              # Save the model after every few epochs
