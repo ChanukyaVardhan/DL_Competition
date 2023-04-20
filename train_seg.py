@@ -205,7 +205,12 @@ if __name__ == "__main__":
     model = model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"])
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
+    # Define class weights. Les weight for background class. Total 49 classes where 0 is background
+    class_weights = torch.ones(params["num_classes"]).to(device)
+    class_weights[0] = 0.2
+
+    criterion = torch.nn.CrossEntropyLoss(
+        weight=class_weights, ignore_index=255)
 
     train_model(model, optimizer, criterion,
                 train_loader, eval_loader, device, params)
