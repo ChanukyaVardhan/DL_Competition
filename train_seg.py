@@ -66,7 +66,7 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 
 def plot_masks(pred_mask, gt_mask, iou_label, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
-    ax, fig = plt.subplots(1, 2, figsize=(15, 15))
+    fig, ax = plt.subplots(1, 2, figsize=(15, 15))
     ax[0].imshow(pred_mask)
     ax[0].set_title("Predicted Mask")
     ax[1].imshow(gt_mask)
@@ -92,9 +92,12 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 
             eval_loss += loss.item()
             # COMPUTE mIoU
+            pred_mask = torch.softmax(output_mask, dim=1)
+            pred_mask = torch.argmax(pred_mask, dim=1)
             pred_mask = torch.argmax(output_mask, dim=1)
             mIoU += jaccard(pred_mask, gt_mask)
-            plot_masks(pred_mask[0], gt_mask[0], mIoU, i)
+            plot_masks(pred_mask[0].cpu().numpy(),
+                       gt_mask[0].cpu().numpy(), mIoU.cpu().numpy(), i)
 
     eval_loss /= len(eval_loader)
     mIoU /= len(eval_loader)

@@ -29,10 +29,12 @@ if __name__ == "__main__":
                              0.0571, 0.0567, 0.0614])
     ])
     data_dir = params["data_dir"]
+    train_dataset = CLEVRERSegDataset(
+        data_dir=data_dir, split='train', user_transforms=transform, num_samples=1000)
     val_dataset = CLEVRERSegDataset(
-        data_dir=data_dir, split='val', user_transforms=transform)
+        data_dir=data_dir, split='val', user_transforms=transform, num_samples=1000)
     eval_loader = DataLoader(
-        val_dataset, batch_size=params["batch_size"]*3, shuffle=False, num_workers=params["num_workers"])
+        train_dataset, batch_size=params["batch_size"]*3, shuffle=False, num_workers=params["num_workers"])
 
     class_weights = torch.ones(params["num_classes"]).to(device)
     class_weights[0] = 0.2
