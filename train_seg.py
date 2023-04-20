@@ -7,7 +7,7 @@ import time
 import gc
 from tqdm import tqdm
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 from torchvision import transforms
 
@@ -22,7 +22,8 @@ def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
-    parser.add_argument("--save_every",  default=False, action="store_true", help="Flag to save every few epochs to True.")
+    parser.add_argument("--save_every",  default=False, action="store_true",
+                        help="Flag to save every few epochs to True.")
     args = parser.parse_args()
 
     with open(args.config_path, "r") as f:
@@ -74,7 +75,8 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 
     mIoU = 0.0
     with torch.no_grad():
-        jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
+        jaccard = torchmetrics.JaccardIndex(
+            task="multiclass", num_classes=49).to(device)
         for i, batch in tqdm(enumerate(eval_loader)):
             input_images, gt_mask = get_batch_entries(batch, device)
             batch_size = input_images.shape[0]
@@ -130,7 +132,6 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
             f"Training Loss - {train_loss:.4f}, Training Time - {train_time:.2f} secs")
 
         wandb.log({"Train Loss": train_loss, "Train Time": train_time})
-        
 
         start_time = time.time()
         eval_loss, mIoU = eval_epoch(
@@ -142,8 +143,6 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
         wandb.log({"Eval Loss": eval_loss, "Eval Time": eval_time, "mIoU": mIoU})
 
         gc.collect()
-
-        
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
@@ -205,7 +204,7 @@ if __name__ == "__main__":
         data_dir=data_dir, split='train', user_transforms=transform)
     val_dataset = CLEVRERSegDataset(
         data_dir=data_dir, split='val', user_transforms=transform)
-    
+
     print(len(train_dataset), len(val_dataset))
     train_loader = DataLoader(
         train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
