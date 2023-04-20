@@ -2,21 +2,21 @@
 checkpoint_path:    "checkpoints"   # Model checkpoint path
 is_pretrain:        True            # Falg to decide pretraining
 cnn_encoder:        "resnet18"      # CNN Encoder for each image frame
-d_emb:              512             # embedding dimension of CNN output
-d_ff:               2048            # embdgging dimension in feed forward network
-n_heads:            8               # Number of heads for multi head attention
 n_layers:           6               # Number of transformer layers
 dropout:            0.              # Dropout value
 
 
 # data
-data_dir:           "./data"        # Data directory
-batch_size:         2               # Batch size
+data_dir:           "/vast/snm6477/DL_Finals/Dataset_Student"        # Data directory
+batch_size:         64               # Batch size
 num_workers:        4               # Number of workers for data loader
+num_classes:        49
 
 # training
 seed:               43              # Random Seed
-num_epochs:         2               # Number of epochs
+num_epochs:         2             # Number of epochs
 resume_training:    False           # Resume Training
+load_path:          ""              # Load saved model from this path
 optimizer:          "adam"          # Optimizer
+save_every:         10              # Save the model after every few epochs
 lr:                 6e-5           # Learning Rate

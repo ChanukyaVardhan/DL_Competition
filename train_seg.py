@@ -20,7 +20,7 @@ import wandb
 def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path", default="config/default.yml", help="Path to config file.")
+        "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
     args = parser.parse_args()
 
     with open(args.config_path, "r") as f:
@@ -133,8 +133,8 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 
         gc.collect()
 
-        wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss,
-                  "Train Time": train_time, "Eval Time": eval_time, "mIoU": mIoU})
+#         wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss,
+#                   "Train Time": train_time, "Eval Time": eval_time, "mIoU": mIoU})
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
@@ -176,14 +176,15 @@ if __name__ == "__main__":
         params["batch_size"] *= num_gpus
         params["num_workers"] *= num_gpus
 
-    wandb.init(
-        entity="dl_competition",
-        config=params,
-    )
+#     wandb.init(
+#         entity="dl_competition",
+#         config=params,
+#     )
 
     transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
+        transforms.ToTensor(),
+#         transforms.RandomHorizontalFlip(),
+#         transforms.RandomVerticalFlip(),
         # transforms.RandomResizedCrop(size = 224, scale = (0.8, 1.0), ratio = (0.8, 1.2)),
         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                              0.0571, 0.0567, 0.0614])
@@ -201,10 +202,10 @@ if __name__ == "__main__":
     eval_loader = DataLoader(
         val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
 
-    model = SegNeXT(params["num_classes"], pretrained=False)
+    model = SegNeXT(params["num_classes"], weights=None)
     model = model.to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=float(params["lr"]))
     # Define class weights. Les weight for background class. Total 49 classes where 0 is background
     class_weights = torch.ones(params["num_classes"]).to(device)
     class_weights[0] = 0.2
@@ -215,4 +216,4 @@ if __name__ == "__main__":
     train_model(model, optimizer, criterion,
                 train_loader, eval_loader, device, params)
 
-    wandb.finish()
+#     wandb.finish()
