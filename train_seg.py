@@ -5,6 +5,7 @@ import torch
 import torchmetrics
 import time
 import gc
+from tqdm import tqdm
 
 from torch.utils.data import Dataset, DataLoader
 
@@ -21,12 +22,15 @@ def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
+    parser.add_argument("--save_every",  default=False, action="store_true",
+                    help="Flag to save every few epochs to True.")
     args = parser.parse_args()
 
     with open(args.config_path, "r") as f:
         params = yaml.load(f, Loader=yaml.SafeLoader)
     params["experiment"] = os.path.splitext(
         os.path.basename(args.config_path))[0]
+    params["is_save_every"] = args.save_every
 
     return params
 
@@ -43,7 +47,7 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
     train_loss = 0.0
     num_samples = 0
 
-    for i, batch in enumerate(train_loader):
+    for i, batch in tqdm(enumerate(train_loader)):
         input_images, gt_mask = get_batch_entries(batch, device)
         batch_size = input_images.shape[0]
 
@@ -70,20 +74,21 @@ def eval_epoch(model, criterion, eval_loader, device, params):
     num_samples = 0
 
     mIoU = 0.0
-    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
-    for i, batch in enumerate(eval_loader):
-        input_images, gt_mask = get_batch_entries(batch, device)
-        batch_size = input_images.shape[0]
+    with torch.no_grad():
+#         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
+        for i, batch in tqdm(enumerate(eval_loader)):
+            input_images, gt_mask = get_batch_entries(batch, device)
+            batch_size = input_images.shape[0]
 
-        output_mask = model(input_images)
-        loss = criterion(output_mask, gt_mask)
+            output_mask = model(input_images)
+            loss = criterion(output_mask, gt_mask)
 
-        eval_loss += loss.item()
-        # COMPUTE mIoU
-        pred_mask = torch.argmax(output_mask, dim=1)
-        mIoU += jaccard(pred_mask, gt_mask)
+            eval_loss += loss.item()
+            # COMPUTE mIoU
+            pred_mask = torch.argmax(output_mask, dim=1)
+#             mIoU += jaccard(pred_mask, gt_mask)
 
-        num_samples += batch_size
+            num_samples += batch_size
 
     eval_loss /= num_samples
     mIoU /= num_samples
@@ -125,6 +130,9 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
         print(
             f"Training Loss - {train_loss:.4f}, Training Time - {train_time:.2f} secs")
 
+        wandb.log({"Train Loss": train_loss, "Train Time": train_time})
+        
+
         start_time = time.time()
         eval_loss, mIoU = eval_epoch(
             model, criterion, eval_loader, device, params)
@@ -132,10 +140,11 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
         eval_time = time.time() - start_time
         print(f"Eval Loss - {eval_loss:.4f}, Eval Time - {eval_time:.2f} secs")
 
+        wandb.log({"Eval Loss": eval_loss, "Eval Time": eval_time, "mIoU": mIoU})
+
         gc.collect()
 
-        wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss,
-                  "Train Time": train_time, "Eval Time": eval_time, "mIoU": mIoU})
+        
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
@@ -197,11 +206,12 @@ if __name__ == "__main__":
         data_dir=data_dir, split='train', user_transforms=transform)
     val_dataset = CLEVRERSegDataset(
         data_dir=data_dir, split='val', user_transforms=transform)
-
+    
+    print(len(train_dataset), len(val_dataset))
     train_loader = DataLoader(
         train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
     eval_loader = DataLoader(
-        val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
+        val_dataset, batch_size=params["batch_size"]*3, shuffle=False, num_workers=params["num_workers"])
 
     model = SegNeXT(params["num_classes"], weights=None)
     model = model.to(device)
