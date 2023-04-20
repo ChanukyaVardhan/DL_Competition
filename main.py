@@ -1,4 +1,4 @@
-from dataset import SampledDataset, collate_fn
+from dataset import SampledDataset, collate_fn, MaskedDataset, collate_mask_fn
 from models import PreTrainModel, VICReg
 from torch.utils.data import ConcatDataset, DataLoader
 
@@ -34,7 +34,7 @@ def get_parameters():
 	params["is_save_every"] = args.save_every
 
 	if args.load_path != "":
-		params["load_path"] = load_path
+		params["load_path"] = args.load_path
 	if args.num_epochs != 0:
 		params["num_epochs"] = args.num_epochs
 	if args.batch_size != 0:
@@ -57,7 +57,25 @@ def get_save_paths(params):
 	prefix 			= get_save_paths_prefix(params)
 
 	model_path 		= f'{prefix}model.pt'
+
 	return model_path
+
+def get_existing_stats(train_stat_path, start_epoch, params):
+	train_stats = {
+		"epoch": 		[],
+		"train_loss": 	[],
+		"eval_loss":	[],
+		# FIX THIS - ADD OTHER METRICS?
+	}
+
+	if params["resume_training"] and os.path.exists(train_stat_path):
+		existing_stats = json.load(open(train_stat_path, "r"))
+
+		for key, val in existing_stats.items():
+			if key in train_stats:
+				train_stats[key] = val[:start_epoch - 1]
+
+	return train_stats
 
 def get_batch_entries(batch, device):
 	input_images 	= batch["input_images"].to(device)
@@ -73,6 +91,7 @@ def get_batch_entries(batch, device):
 def train_epoch(model, optimizer, criterion, train_loader, device, params):
 	model.train()
 	train_loss 		= 0.0
+	train_accuracy 	= 0.0
 	num_samples 	= 0
 
 	for i, batch in enumerate(train_loader):
@@ -89,19 +108,22 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 
 		train_loss 	   += loss.item()
 		# FIX THIS - COMPUTE ACCURACY HERE?
-
+		cos 			= nn.CosineSimilarity(dim=1, eps=1e-6)
+		train_accuracy += cos(x_encoding_pred, y_encoding)
 		loss.backward()
 		optimizer.step()
 
 		num_samples    += batch_size
 
 	train_loss /= num_samples
+	train_accuracy  /= num_samples
 
-	return train_loss
+	return train_loss, train_accuracy
 
 def eval_epoch(model, criterion, eval_loader, device, params):
 	model.eval()
 	eval_loss 		= 0.0
+	eval_accuracy 	= 0.0
 	num_samples 	= 0
 
 	for i, batch in enumerate(eval_loader):
@@ -116,14 +138,20 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 
 		eval_loss 	   += loss.item()
 		# FIX THIS - COMPUTE ACCURACY HERE?
-
+		# FIX THIS - WHAT METRIC? COSINE SIMILARITY?
+		cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+		eval_accuracy  += cos(x_encoding_pred, y_encoding)
 		num_samples    += batch_size
 
 	eval_loss /= num_samples
+	eval_accuracy  /= num_samples
 
-	return eval_loss
+	return eval_loss, eval_accuracy
 
 def train_model(model, optimizer, criterion, train_loader, eval_loader, device, params):
+	params_with_grad = filter(lambda p: p.requires_grad, model.parameters())
+	params_count = sum([np.prod(p.size()) for p in params_with_grad])
+	print(f"Total number of trainable parameters: {params_count}")
 	model.train()
 
 	start_epoch 	= 1
@@ -148,21 +176,22 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 		print(f"Training Epoch - {epoch}")
 
 		start_time 	= time.time()
-		train_loss 	= train_epoch(model, optimizer, criterion, train_loader, device, params)
+		train_loss, train_acc 	= train_epoch(model, optimizer, criterion, train_loader, device, params)
 		torch.cuda.empty_cache()
 		train_time 	= time.time() - start_time
 		print(f"Training Loss - {train_loss:.4f}, Training Time - {train_time:.2f} secs")
 
 		start_time 	= time.time()
-		eval_loss 	= eval_epoch(model, criterion, eval_loader, device, params)
+		eval_loss, eval_acc 	= eval_epoch(model, criterion, eval_loader, device, params)
 		torch.cuda.empty_cache()
 		eval_time 	= time.time() - start_time
 		print(f"Eval Loss - {eval_loss:.4f}, Eval Time - {eval_time:.2f} secs")
 
 		gc.collect()
 
-		wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss, "Train Time": train_time, "Eval Time": eval_time})
-
+		wandb.log({"Epoch": epoch, "Train Loss": train_loss, "Eval Loss": eval_loss, "Train Time": train_time, "Eval Time": eval_time})
+		
+		 
 		if eval_loss < best_eval_loss:
 			best_eval_loss = eval_loss
 			print(f"Saving model with best eval loss - {best_eval_loss:.4f}")
@@ -225,14 +254,16 @@ if __name__ == "__main__":
 						])	
 		eval_dataset 	= SampledDataset(data_dir = params["data_dir"], split = "val", transform = transform)
 	else:
-		raise Exception("Not implemented Yet!")
+		train_dataset = MaskedDataset(data_dir = params["data_dir"], split = "train", transform = transform)
+		eval_dataset = MaskedDataset(data_dir = params["data_dir"], split = "val", transform = transform)
 
 	# Dataloaders
 	if params["is_pretrain"]:
 		train_loader 	= DataLoader(train_dataset, batch_size = params["batch_size"], shuffle = True, collate_fn = collate_fn, num_workers = params["num_workers"])
 		eval_loader 	= DataLoader(eval_dataset, batch_size = params["batch_size"], shuffle = False, collate_fn = collate_fn, num_workers = params["num_workers"])
 	else:
-		raise Exception("Not implemented Yet!")
+		train_loader = DataLoader(train_dataset, batch_size = params["batch_size"], shuffle = True, collate_fn = collate_mask_fn,num_workers = params["num_workers"])
+		eval_loader = DataLoader(eval_dataset, batch_size = params["batch_size"], shuffle = False, collate_fn = collate_mask_fn, num_workers = params["num_workers"])
 
 	# Model
 	if params["is_pretrain"]:
