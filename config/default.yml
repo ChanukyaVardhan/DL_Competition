@@ -1,24 +1,25 @@
 # model
 checkpoint_path:    "checkpoints"   # Model checkpoint path
-is_pretrain:        True            # Falg to decide pretraining
 cnn_encoder:        "resnet18"      # CNN Encoder for each image frame
 d_emb:              512             # embedding dimension of CNN output
-d_ff:               2048            # embdgging dimension in feed forward network
+d_ff:               2048            # embedding dimension in feed forward network
 n_heads:            8               # Number of heads for multi head attention
-n_layers:           6               # Number of transformer layers
-dropout:            0.              # Dropout value
+n_layers:           4               # Number of transformer layers
+dropout:            0.1             # Dropout value
 sim_coeff:          25              # Sim Coeff
 std_coeff:          25              # Std Coeff
 cov_coeff:          1               # Cov Coeff
 
 # data
 data_dir:           "./data"        # Data directory
-batch_size:         2               # Batch size
-num_workers:        4               # Number of workers for data loader
+batch_size:         24              # Batch size
+num_workers:        6               # Number of workers for data loader
 
 # training
 seed:               43              # Random Seed
-num_epochs:         2               # Number of epochs
+num_epochs:         100             # Number of epochs
 resume_training:    False           # Resume Training
+load_path:          ""              # Load saved model from this path
 optimizer:          "adam"          # Optimizer
 lr:                 0.001           # Learning Rate
+save_every:         10              # Save the model after every few epochs
