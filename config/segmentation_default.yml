@@ -14,7 +14,7 @@ num_classes:        49
 
 # training
 seed:               43              # Random Seed
-num_epochs:         2             # Number of epochs
+num_epochs:         100             # Number of epochs
 resume_training:    False           # Resume Training
 load_path:          ""              # Load saved model from this path
 optimizer:          "adam"          # Optimizer
