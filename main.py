@@ -34,7 +34,7 @@ def get_parameters():
 	params["is_save_every"] = args.save_every
 
 	if args.load_path != "":
-		params["load_path"] = load_path
+		params["load_path"] = args.load_path
 	if args.num_epochs != 0:
 		params["num_epochs"] = args.num_epochs
 	if args.batch_size != 0:
