@@ -82,7 +82,7 @@ def eval_epoch(model, criterion, eval_loader, device, params):
     mIoU = 0.0
     with torch.no_grad():
         jaccard = torchmetrics.JaccardIndex(
-            task="multiclass", num_classes=49).to(device)
+            task="multiclass", num_classes=49, ignore_index=255).to(device)
         for i, batch in tqdm(enumerate(eval_loader)):
             input_images, gt_mask = get_batch_entries(batch, device)
             batch_size = input_images.shape[0]
@@ -94,10 +94,15 @@ def eval_epoch(model, criterion, eval_loader, device, params):
             # COMPUTE mIoU
             pred_mask = torch.softmax(output_mask, dim=1)
             pred_mask = torch.argmax(pred_mask, dim=1)
+            print(pred_mask[0])
             pred_mask = torch.argmax(output_mask, dim=1)
-            mIoU += jaccard(pred_mask, gt_mask)
+            print(torch.unique(pred_mask[0], return_counts=True))
             plot_masks(pred_mask[0].cpu().numpy(),
-                       gt_mask[0].cpu().numpy(), mIoU.cpu().numpy(), i)
+                       gt_mask[0].cpu().numpy(), 0, i)
+            iou = jaccard(pred_mask, gt_mask)
+            print(pred_mask.shape, gt_mask.shape, iou)
+            mIoU += jaccard(pred_mask, gt_mask)
+            
 
     eval_loss /= len(eval_loader)
     mIoU /= len(eval_loader)
