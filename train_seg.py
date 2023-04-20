@@ -14,7 +14,7 @@ from torchvision import transforms
 from dataloader import CLEVRERSegDataset
 from segmentation import SegNeXT
 from main import get_save_paths_prefix, get_save_paths
-
+import matplotlib.pyplot as plt
 import wandb
 
 
@@ -45,11 +45,9 @@ def get_batch_entries(batch, device):
 def train_epoch(model, optimizer, criterion, train_loader, device, params):
     model.train()
     train_loss = 0.0
-    num_samples = 0
 
     for i, batch in tqdm(enumerate(train_loader)):
         input_images, gt_mask = get_batch_entries(batch, device)
-        batch_size = input_images.shape[0]
 
         optimizer.zero_grad()
 
@@ -61,17 +59,25 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
         loss.backward()
         optimizer.step()
 
-    num_samples += batch_size
-
-    train_loss /= num_samples
+    train_loss /= len(train_loader)
 
     return train_loss
+
+
+def plot_masks(pred_mask, gt_mask, iou_label, idx):
+    # Plot the predicted mask and the ground truth mask side by side with the IoU score
+    ax, fig = plt.subplots(1, 2, figsize=(15, 15))
+    ax[0].imshow(pred_mask)
+    ax[0].set_title("Predicted Mask")
+    ax[1].imshow(gt_mask)
+    ax[1].set_title("Ground Truth Mask")
+    plt.suptitle("IoU: {}".format(iou_label))
+    plt.savefig(f"result_{idx}.png")
 
 
 def eval_epoch(model, criterion, eval_loader, device, params):
     model.eval()
     eval_loss = 0.0
-    num_samples = 0
 
     mIoU = 0.0
     with torch.no_grad():
@@ -88,11 +94,10 @@ def eval_epoch(model, criterion, eval_loader, device, params):
             # COMPUTE mIoU
             pred_mask = torch.argmax(output_mask, dim=1)
             mIoU += jaccard(pred_mask, gt_mask)
+            plot_masks(pred_mask[0], gt_mask[0], mIoU, i)
 
-            num_samples += batch_size
-
-    eval_loss /= num_samples
-    mIoU /= num_samples
+    eval_loss /= len(eval_loader)
+    mIoU /= len(eval_loader)
 
     return eval_loss, mIoU
 
