@@ -20,7 +20,7 @@ import wandb
 def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path", default="config/default.yml", help="Path to config file.")
+        "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
     args = parser.parse_args()
 
     with open(args.config_path, "r") as f:
@@ -50,6 +50,7 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
         optimizer.zero_grad()
 
         output_mask = model(input_images)
+#         print(gt_mask.dtype, output_mask.dtype)
         loss = criterion(output_mask, gt_mask)
         train_loss += loss.item()
 
@@ -69,7 +70,7 @@ def eval_epoch(model, criterion, eval_loader, device, params):
     num_samples = 0
 
     mIoU = 0.0
-    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
+    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
     for i, batch in enumerate(eval_loader):
         input_images, gt_mask = get_batch_entries(batch, device)
         batch_size = input_images.shape[0]
@@ -182,8 +183,9 @@ if __name__ == "__main__":
     )
 
     transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
+        transforms.ToTensor(),
+#         transforms.RandomHorizontalFlip(),
+#         transforms.RandomVerticalFlip(),
         # transforms.RandomResizedCrop(size = 224, scale = (0.8, 1.0), ratio = (0.8, 1.2)),
         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                              0.0571, 0.0567, 0.0614])
@@ -201,10 +203,10 @@ if __name__ == "__main__":
     eval_loader = DataLoader(
         val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
 
-    model = SegNeXT(params["num_classes"], pretrained=False)
+    model = SegNeXT(params["num_classes"], weights=None)
     model = model.to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=float(params["lr"]))
     # Define class weights. Les weight for background class. Total 49 classes where 0 is background
     class_weights = torch.ones(params["num_classes"]).to(device)
     class_weights[0] = 0.2

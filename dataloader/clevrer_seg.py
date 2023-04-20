@@ -8,7 +8,7 @@ import torchvision.transforms as transforms
 
 class CLEVRERSegDataset(Dataset):
 
-    def _init_(self, data_dir='./data/', split='train', user_transforms=None):
+    def __init__(self, data_dir='./data/', split='train', user_transforms=None):
         self.data_dir = data_dir
         self.split = split
 
@@ -20,16 +20,12 @@ class CLEVRERSegDataset(Dataset):
         self.image_paths = [os.path.join(vpath, f"image_{i}.png") for i in range(
             22) for vpath in self.video_paths]
 
-        self.transform = transforms.Compose([
-            transforms.ToTensor()
-            # Append user_transforms list here
-            ** user_transforms
-        ])
+        self.transforms = user_transforms
 
-    def _len_(self):
+    def __len__(self):
         return len(self.image_paths)
 
-    def _getitem_(self, index):
+    def __getitem__(self, index):
         image_path = self.image_paths[index]
         video_path, image_name = os.path.split(image_path)
 
@@ -43,6 +39,6 @@ class CLEVRERSegDataset(Dataset):
         mask[mask > 49] = 255
 
         if self.transforms is not None:
-            img, target = self.transforms(img, target)
+            image = self.transforms(image)
 
-        return image, mask
+        return image, mask.long()

@@ -86,32 +86,34 @@ class ModifiedSegNeXT(nn.Module):
 
 
 class SegNeXT(nn.Module):
-    def __init__(self, num_classes, pretrained=True):
+    def __init__(self, num_classes, weights=None):
         super(SegNeXT, self).__init__()
 
         # Load pre-trained ResNeXt50-32x4d model
-        base_model = resnext50_32x4d(pretrained=pretrained)
+        base_model = resnext50_32x4d(weights=weights)
         self.encoder = nn.Sequential(*list(base_model.children())[:-2])
 
         # Replace first convolution layer to accept different number of input channels
         self.encoder[0] = nn.Conv2d(
-            11, 64, kernel_size=7, stride=2, padding=3, bias=False)
+            3, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
         # Add SEResNeXt blocks for decoder
         self.decoder = nn.Sequential(
             SEResNeXtBottleneck(2048, 512, 1, 32, 4, 16),
-            nn.ConvTranspose2d(2048, 1024, kernel_size=2, stride=2, padding=0),
+            nn.ConvTranspose2d(2048, 1024, kernel_size=4, stride=2, padding=1),
             SEResNeXtBottleneck(1024, 256, 1, 32, 4, 16),
-            nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2, padding=0),
+            nn.ConvTranspose2d(1024, 512, kernel_size=4, stride=2, padding=1),
             SEResNeXtBottleneck(512, 128, 1, 32, 4, 16),
-            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2, padding=0),
+            nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1),
             SEResNeXtBottleneck(256, 64, 1, 32, 4, 16),
-            nn.Conv2d(256, num_classes, kernel_size=1)
+            nn.ConvTranspose2d(
+                256, num_classes, kernel_size=8, stride=4, padding=2)
         )
 
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
+        x = x[:, :, :, :240]
         return x
 
 
