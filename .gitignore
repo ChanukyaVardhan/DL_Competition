@@ -29,3 +29,5 @@ _site
 
 # wandb
 wandb*
+*.ninja
+.ninja_*
