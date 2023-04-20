@@ -21,12 +21,16 @@ def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
+    parser.add_argument("--save_every",  default=False, action="store_true",
+                        help="Flag to save every few epochs to True.")
+
     args = parser.parse_args()
 
     with open(args.config_path, "r") as f:
         params = yaml.load(f, Loader=yaml.SafeLoader)
     params["experiment"] = os.path.splitext(
         os.path.basename(args.config_path))[0]
+    params["is_save_every"] = args.save_every
 
     return params
 
@@ -70,7 +74,8 @@ def eval_epoch(model, criterion, eval_loader, device, params):
     num_samples = 0
 
     mIoU = 0.0
-    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
+    jaccard = torchmetrics.JaccardIndex(
+        task="multiclass", num_classes=49).to(device)
     for i, batch in enumerate(eval_loader):
         input_images, gt_mask = get_batch_entries(batch, device)
         batch_size = input_images.shape[0]
@@ -184,8 +189,8 @@ if __name__ == "__main__":
 
     transform = transforms.Compose([
         transforms.ToTensor(),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.RandomVerticalFlip(),
+        #         transforms.RandomHorizontalFlip(),
+        #         transforms.RandomVerticalFlip(),
         # transforms.RandomResizedCrop(size = 224, scale = (0.8, 1.0), ratio = (0.8, 1.2)),
         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                              0.0571, 0.0567, 0.0614])

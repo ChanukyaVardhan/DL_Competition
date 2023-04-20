@@ -25,6 +25,7 @@ data
 .jekyll-cache
 _site
 .vscode
+*.Identifier
 
 # wandb
 wandb*

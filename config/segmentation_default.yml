@@ -20,3 +20,4 @@ load_path:          ""              # Load saved model from this path
 optimizer:          "adam"          # Optimizer
 save_every:         10              # Save the model after every few epochs
 lr:                 6e-5           # Learning Rate
+save_every:         10              # Save the model after every few epochs
