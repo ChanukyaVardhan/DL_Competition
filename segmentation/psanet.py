@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 import lib.psa.functional as PF
-import torchvision.models as models
+import resnet as models
 
 
 class PSA(nn.Module):
@@ -114,7 +114,7 @@ class PSA(nn.Module):
 class PSANet(nn.Module):
     def __init__(self, layers=50, dropout=0.1, classes=2, zoom_factor=8, use_psa=True, psa_type=2, compact=False,
                  shrink_factor=2, mask_h=59, mask_w=59, normalization_factor=1.0, psa_softmax=True,
-                 criterion=nn.CrossEntropyLoss(ignore_index=255), weights=None):
+                 criterion=nn.CrossEntropyLoss(ignore_index=255), pretrained=False):
         super(PSANet, self).__init__()
         assert layers in [50, 101, 152]
         assert classes > 1
@@ -125,13 +125,13 @@ class PSANet(nn.Module):
         self.criterion = criterion
 
         if layers == 50:
-            resnet = models.resnet50(weights=weights)
+            resnet = models.resnet50(pretrained=pretrained)
         elif layers == 101:
-            resnet = models.resnet101(weights=weights)
+            resnet = models.resnet101(pretrained=pretrained)
         else:
-            resnet = models.resnet152(weights=weights)
-        self.layer0 = nn.Sequential(
-            resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool)
+            resnet = models.resnet152(pretrained=pretrained)
+        self.layer0 = nn.Sequential(resnet.conv1, resnet.bn1, resnet.relu, resnet.conv2,
+                                    resnet.bn2, resnet.relu, resnet.conv3, resnet.bn3, resnet.relu, resnet.maxpool)
         self.layer1, self.layer2, self.layer3, self.layer4 = resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4
 
         for n, m in self.layer3.named_modules():
@@ -168,7 +168,6 @@ class PSANet(nn.Module):
 
     def forward(self, x, y=None):
         x_size = x.size()
-        print(x_size)
         assert (x_size[2] - 1) % 8 == 0 and (x_size[3] - 1) % 8 == 0
         h = int((x_size[2] - 1) / 8 * self.zoom_factor + 1)
         w = int((x_size[3] - 1) / 8 * self.zoom_factor + 1)
@@ -226,8 +225,8 @@ if __name__ == '__main__':
             assert (mask_w % 2 == 1) and (mask_w >= 3) and (
                 mask_w <= 2 * ((crop_h - 1) // (8 * shrink_factor) + 1) - 1)
 
-    model = PSANet(layers=50, dropout=0.1, classes=49, zoom_factor=8, use_psa=False, psa_type=2, compact=compact,
-                   shrink_factor=shrink_factor, mask_h=mask_h, mask_w=mask_w, psa_softmax=True, weights=None)
+    model = PSANet(layers=50, dropout=0.1, classes=49, zoom_factor=8, use_psa=True, psa_type=2, compact=compact,
+                   shrink_factor=shrink_factor, mask_h=mask_h, mask_w=mask_w, psa_softmax=True, pretrained=False)
     # print(model)
     model.eval()
     output = model(input)
