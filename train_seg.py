@@ -50,6 +50,7 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
         optimizer.zero_grad()
 
         output_mask = model(input_images)
+#         print(gt_mask.dtype, output_mask.dtype)
         loss = criterion(output_mask, gt_mask)
         train_loss += loss.item()
 
@@ -69,7 +70,7 @@ def eval_epoch(model, criterion, eval_loader, device, params):
     num_samples = 0
 
     mIoU = 0.0
-    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
+    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
     for i, batch in enumerate(eval_loader):
         input_images, gt_mask = get_batch_entries(batch, device)
         batch_size = input_images.shape[0]
@@ -133,8 +134,8 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
 
         gc.collect()
 
-#         wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss,
-#                   "Train Time": train_time, "Eval Time": eval_time, "mIoU": mIoU})
+        wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss,
+                  "Train Time": train_time, "Eval Time": eval_time, "mIoU": mIoU})
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
@@ -176,10 +177,10 @@ if __name__ == "__main__":
         params["batch_size"] *= num_gpus
         params["num_workers"] *= num_gpus
 
-#     wandb.init(
-#         entity="dl_competition",
-#         config=params,
-#     )
+    wandb.init(
+        entity="dl_competition",
+        config=params,
+    )
 
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -216,4 +217,4 @@ if __name__ == "__main__":
     train_model(model, optimizer, criterion,
                 train_loader, eval_loader, device, params)
 
-#     wandb.finish()
+    wandb.finish()

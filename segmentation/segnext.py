@@ -100,18 +100,20 @@ class SegNeXT(nn.Module):
         # Add SEResNeXt blocks for decoder
         self.decoder = nn.Sequential(
             SEResNeXtBottleneck(2048, 512, 1, 32, 4, 16),
-            nn.ConvTranspose2d(2048, 1024, kernel_size=2, stride=2, padding=0),
+            nn.ConvTranspose2d(2048, 1024, kernel_size=4, stride=2, padding=1),
             SEResNeXtBottleneck(1024, 256, 1, 32, 4, 16),
-            nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2, padding=0),
+            nn.ConvTranspose2d(1024, 512, kernel_size=4, stride=2, padding=1),
             SEResNeXtBottleneck(512, 128, 1, 32, 4, 16),
-            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2, padding=0),
+            nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1),
             SEResNeXtBottleneck(256, 64, 1, 32, 4, 16),
-            nn.Conv2d(256, num_classes, kernel_size=1)
+            nn.ConvTranspose2d(
+                256, num_classes, kernel_size=8, stride=4, padding=2)
         )
 
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
+        x = x[:, :, :, :240]
         return x
 
 
