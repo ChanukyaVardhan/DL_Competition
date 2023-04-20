@@ -1,4 +1,4 @@
-from dataset import SampledDataset, collate_fn
+from dataset import SampledDataset, collate_fn, MaskedDataset, collate_mask_fn
 from models import PreTrainModel, VICReg
 from torch.utils.data import ConcatDataset, DataLoader
 
@@ -237,14 +237,16 @@ if __name__ == "__main__":
 						])	
 		eval_dataset 	= SampledDataset(data_dir = params["data_dir"], split = "val", transform = transform)
 	else:
-		raise Exception("Not implemented Yet!")
+		train_dataset = MaskedDataset(data_dir = params["data_dir"], split = "train", transform = transform)
+		eval_dataset = MaskedDataset(data_dir = params["data_dir"], split = "val", transform = transform)
 
 	# Dataloaders
 	if params["is_pretrain"]:
 		train_loader 	= DataLoader(train_dataset, batch_size = params["batch_size"], shuffle = True, collate_fn = collate_fn, num_workers = params["num_workers"])
 		eval_loader 	= DataLoader(eval_dataset, batch_size = params["batch_size"], shuffle = False, collate_fn = collate_fn, num_workers = params["num_workers"])
 	else:
-		raise Exception("Not implemented Yet!")
+		train_loader = DataLoader(train_dataset, batch_size = params["batch_size"], shuffle = True, collate_fn = collate_mask_fn,num_workers = params["num_workers"])
+		eval_loader = DataLoader(eval_dataset, batch_size = params["batch_size"], shuffle = False, collate_fn = collate_mask_fn, num_workers = params["num_workers"])
 
 	# Model
 	if params["is_pretrain"]:
