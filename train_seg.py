@@ -14,6 +14,7 @@ from torchvision import transforms
 from dataloader import CLEVRERSegDataset
 from segmentation import SegNeXT
 from main import get_save_paths_prefix, get_save_paths
+from utils import class_labels
 import matplotlib.pyplot as plt
 import wandb
 
@@ -64,15 +65,13 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
     return train_loss
 
 
-def plot_masks(pred_mask, gt_mask, iou_label, idx):
+def plot_masks(pred_mask, gt_mask, image, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
-    fig, ax = plt.subplots(1, 2, figsize=(15, 15))
-    ax[0].imshow(pred_mask)
-    ax[0].set_title("Predicted Mask")
-    ax[1].imshow(gt_mask)
-    ax[1].set_title("Ground Truth Mask")
-    plt.suptitle("IoU: {}".format(iou_label))
-    plt.savefig(f"result_{idx}.png")
+
+    return wandb.Image(image, masks={
+        "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
+        "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
+    })
 
 
 def eval_epoch(model, criterion, eval_loader, device, params):
@@ -80,9 +79,10 @@ def eval_epoch(model, criterion, eval_loader, device, params):
     eval_loss = 0.0
 
     mIoU = 0.0
+    mask_list = []
     with torch.no_grad():
-        jaccard = torchmetrics.JaccardIndex(
-            task="multiclass", num_classes=49, ignore_index=255).to(device)
+        # jaccard = torchmetrics.JaccardIndex(
+        #     task="multiclass", num_classes=49).to(device)
         for i, batch in tqdm(enumerate(eval_loader)):
             input_images, gt_mask = get_batch_entries(batch, device)
             batch_size = input_images.shape[0]
@@ -92,17 +92,10 @@ def eval_epoch(model, criterion, eval_loader, device, params):
 
             eval_loss += loss.item()
             # COMPUTE mIoU
-            pred_mask = torch.softmax(output_mask, dim=1)
-            pred_mask = torch.argmax(pred_mask, dim=1)
-            print(pred_mask[0])
             pred_mask = torch.argmax(output_mask, dim=1)
-            print(torch.unique(pred_mask[0], return_counts=True))
-            plot_masks(pred_mask[0].cpu().numpy(),
-                       gt_mask[0].cpu().numpy(), 0, i)
-            iou = jaccard(pred_mask, gt_mask)
-            print(pred_mask.shape, gt_mask.shape, iou)
-            mIoU += jaccard(pred_mask, gt_mask)
-            
+            # mIoU += jaccard(pred_mask, gt_mask)
+            mask_list.append(plot_masks(pred_mask[0].cpu().numpy(),
+                                        gt_mask[0].cpu().numpy(), input_images[0].cpu.numpy(), i))
 
     eval_loss /= len(eval_loader)
     mIoU /= len(eval_loader)
