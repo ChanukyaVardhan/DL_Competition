@@ -1,0 +1,22 @@
+# model
+checkpoint_path:    "checkpoints"   # Model checkpoint path
+is_pretrain:        True            # Falg to decide pretraining
+cnn_encoder:        "resnet18"      # CNN Encoder for each image frame
+d_emb:              512             # embedding dimension of CNN output
+d_ff:               2048            # embdgging dimension in feed forward network
+n_heads:            8               # Number of heads for multi head attention
+n_layers:           6               # Number of transformer layers
+dropout:            0.              # Dropout value
+
+
+# data
+data_dir:           "./data"        # Data directory
+batch_size:         2               # Batch size
+num_workers:        4               # Number of workers for data loader
+
+# training
+seed:               43              # Random Seed
+num_epochs:         2               # Number of epochs
+resume_training:    False           # Resume Training
+optimizer:          "adam"          # Optimizer
+lr:                 6e-5           # Learning Rate

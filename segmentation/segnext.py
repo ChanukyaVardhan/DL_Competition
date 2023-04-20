@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torchvision.models import resnext50_32x4d
 
+
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=16):
         super(SELayer, self).__init__()
@@ -19,23 +20,28 @@ class SELayer(nn.Module):
         y = self.fc(y).view(b, c, 1, 1)
         return x * y.expand_as(x)
 
+
 class SEResNeXtBottleneck(nn.Module):
     expansion = 4
 
     def __init__(self, in_channels, out_channels, stride, cardinality, width, reduction):
         super(SEResNeXtBottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels * width, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv1 = nn.Conv2d(in_channels, out_channels * width,
+                               kernel_size=1, stride=1, padding=0, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels * width)
-        self.conv2 = nn.Conv2d(out_channels * width, out_channels * width, kernel_size=3, stride=stride, padding=1, groups=cardinality, bias=False)
+        self.conv2 = nn.Conv2d(out_channels * width, out_channels * width,
+                               kernel_size=3, stride=stride, padding=1, groups=cardinality, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels * width)
-        self.conv3 = nn.Conv2d(out_channels * width, out_channels * self.expansion, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv3 = nn.Conv2d(out_channels * width, out_channels *
+                               self.expansion, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn3 = nn.BatchNorm2d(out_channels * self.expansion)
         self.se_layer = SELayer(out_channels * self.expansion, reduction)
         self.relu = nn.ReLU(inplace=True)
 
         if in_channels != out_channels * self.expansion:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels * self.expansion, kernel_size=1, stride=stride, padding=0, bias=False),
+                nn.Conv2d(in_channels, out_channels * self.expansion,
+                          kernel_size=1, stride=stride, padding=0, bias=False),
                 nn.BatchNorm2d(out_channels * self.expansion)
             )
         else:
@@ -57,7 +63,8 @@ class ModifiedSegNeXT(nn.Module):
         super(ModifiedSegNeXT, self).__init__()
 
         # Projector to convert to 2d dimensions.
-        self.fc = nn.Linear(embedding_dim, feature_map_channels * height * width)
+        self.fc = nn.Linear(
+            embedding_dim, feature_map_channels * height * width)
 
         # Add SEResNeXt blocks for decoder
         self.decoder = nn.Sequential(
@@ -76,7 +83,7 @@ class ModifiedSegNeXT(nn.Module):
         x = x.view(x.size(0), 2048, 7, 7)
         x = self.decoder(x)
         return x
-  
+
 
 class SegNeXT(nn.Module):
     def __init__(self, num_classes, pretrained=True):
@@ -87,7 +94,8 @@ class SegNeXT(nn.Module):
         self.encoder = nn.Sequential(*list(base_model.children())[:-2])
 
         # Replace first convolution layer to accept different number of input channels
-        self.encoder[0] = nn.Conv2d(11, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.encoder[0] = nn.Conv2d(
+            11, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
         # Add SEResNeXt blocks for decoder
         self.decoder = nn.Sequential(
@@ -109,7 +117,8 @@ class SegNeXT(nn.Module):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-     
+
+
 if __name__ == '__main__':
     model = ModifiedSegNeXT(10, 512, 256, 8, 8)
     print(count_parameters(model))
