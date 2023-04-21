@@ -5,7 +5,8 @@ from torchvision.models.detection.anchor_utils import AnchorGenerator
 
 # load a pre-trained model for classification and return
 # only the features
-backbone = torchvision.models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT).features
+backbone = torchvision.models.mobilenet_v2(
+    weights=MobileNet_V2_Weights.DEFAULT).features
 # MaskRCNN needs to know the number of
 # output channels in a backbone. For mobilenet_v2, it's 1280
 # so we need to add it here,
