@@ -125,9 +125,9 @@ if __name__ == "__main__":
     num_epochs = params["num_epochs"]
 
     transform = transforms.Compose([
-        transforms.ToTensor()
-        # transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
-        #                      0.0571, 0.0567, 0.0614])
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+                             0.0571, 0.0567, 0.0614])
     ])
 
     wandb.init(
