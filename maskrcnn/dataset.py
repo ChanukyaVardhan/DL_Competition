@@ -58,7 +58,7 @@ class MaskRCNNDataset(Dataset):
                     better_boxes = torch.cat((better_boxes, boxes[obj].unsqueeze(0)))
         
         assert(better_boxes is not None)
-        print("better_boxes : ", better_boxes.size(0), " -------  ", boxes.size(0))
+        # print("better_boxes : ", better_boxes.size(0), " -------  ", boxes.size(0))
         return masks, obj_ids, better_boxes
 
     def __getitem__(self, index):
