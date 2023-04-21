@@ -65,7 +65,7 @@ def train_model(model, train_loader, optimizer, device, epoch):
         optimizer.zero_grad()
         outputs = model(images, targets)
         loss = sum(loss for loss in outputs.values())
-        loss.backward()
+        loss.sum().backward()
         optimizer.step()
         total_loss += loss.item() / images.size(0)
         total_batches += 1
