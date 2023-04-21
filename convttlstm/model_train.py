@@ -25,6 +25,7 @@ from dataloader import KTH_Dataset, MNIST_Dataset, OUR_Dataset
 
 from utils.gpu_affinity import set_affinity
 # from apex import amp
+from torch.cuda.amp import autocast, GradScaler
 import torchvision.transforms as transforms
 import wandb
 
@@ -94,9 +95,9 @@ def main(args):
     batch_size = total_batch_size // world_size
 
     transform = transforms.Compose([
-        transforms.Resize((64, 64)), # FIX THIS
+        # transforms.Resize((64, 64)), # FIX THIS
         transforms.ToTensor(),
-        # transforms.Normalize(mean = [0.5061, 0.5045, 0.5008], std = [0.0571, 0.0567, 0.0614])
+        transforms.Normalize(mean = [0.5061, 0.5045, 0.5008], std = [0.0571, 0.0567, 0.0614])
     ])
 
     ######################
@@ -177,8 +178,10 @@ def main(args):
     else: # if not args.use_fused:
         optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
 
+    # if args.use_amp:
+    #     model, optimizer = amp.initialize(model, optimizer, opt_level = "O1")
     if args.use_amp:
-        model, optimizer = amp.initialize(model, optimizer, opt_level = "O1")
+        scaler = GradScaler()
 
     if args.distributed:
         if args.use_apex: # use DDP from apex.parallel
@@ -203,15 +206,25 @@ def main(args):
             inputs = frames[:, :-1]
             origin = frames[:, -args.output_frames:]
 
-            pred = model(inputs, 
-                input_frames  =  args.input_frames, 
-                future_frames = args.future_frames, 
-                output_frames = args.output_frames, 
-                teacher_forcing = True,
-                scheduled_sampling_ratio = scheduled_sampling_ratio, 
-                checkpointing = args.use_checkpointing)
-
-            loss = loss_func(pred, origin)
+            if arg.use_amp:
+                with autocast(dtype = torch.float16):
+                    pred = model(inputs, 
+                        input_frames  =  args.input_frames, 
+                        future_frames = args.future_frames, 
+                        output_frames = args.output_frames, 
+                        teacher_forcing = True,
+                        scheduled_sampling_ratio = scheduled_sampling_ratio, 
+                        checkpointing = args.use_checkpointing)
+                    loss = loss_func(pred, origin)
+            else:
+                pred = model(inputs, 
+                    input_frames  =  args.input_frames, 
+                    future_frames = args.future_frames, 
+                    output_frames = args.output_frames, 
+                    teacher_forcing = True,
+                    scheduled_sampling_ratio = scheduled_sampling_ratio, 
+                    checkpointing = args.use_checkpointing)
+                loss = loss_func(pred, origin)
 
             if args.distributed:
                 reduced_loss = reduce_tensor(loss.data)
@@ -223,18 +236,25 @@ def main(args):
             LOSS += reduced_loss.item() * total_batch_size
             
             if args.use_amp:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
+                # with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    # scaled_loss.backward()
+                scaler.scale(loss).backward()
                 if args.gradient_clipping:
                     grad_norm = nn.utils.clip_grad_norm_(
-                        amp.master_params(optimizer), args.clipping_threshold)
+                        # amp.master_params(optimizer), args.clipping_threshold)
+                        model.parameters(), args.clipping_threshold)
             else: # if not args.use_amp:
                 loss.backward()
                 if args.gradient_clipping:
                     grad_norm = nn.utils.clip_grad_norm_(
                         model.parameters(), args.clipping_threshold)
 
-            optimizer.step()
+            if args.use_amp:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
+            
 
             if args.local_rank == 0:
                 print('Epoch: {}/{}, Training: {}/{}, Loss: {}'.format(
