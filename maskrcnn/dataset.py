@@ -47,7 +47,7 @@ class MaskRCNNDataset(Dataset):
 
         # print("objss : ", obj_ids.shape)
 
-        boxes = masks_to_boxes(masks).long()
+        boxes = masks_to_boxes(masks).float()
         better_boxes = None
         N = boxes.size(0)
         for obj in range(N):
