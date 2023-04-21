@@ -45,6 +45,7 @@ def get_batch_entries(batch, device):
 
 def plot_masks(pred_mask, gt_mask, image, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
+    image = image.astype(np.uint8).transpose(1, 2, 0)
 
     return wandb.Image(image, masks={
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
