@@ -114,7 +114,7 @@ if __name__ == "__main__":
     # get number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(
-        in_features, num_classes=48)  # replace the pre-trained head with a new one
+        in_features, num_classes=49)  # replace the pre-trained head with a new one
     model = torch.nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
