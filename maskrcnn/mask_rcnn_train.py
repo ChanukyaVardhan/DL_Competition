@@ -67,7 +67,7 @@ def train_model(model, train_loader, optimizer, device, epoch):
         loss = sum(loss for loss in outputs.values())
         loss.sum().backward()
         optimizer.step()
-        total_loss += loss.item() / images.size(0)
+        total_loss += loss.sum().item() / images.size(0)
         total_batches += 1
 
     print("Epoch: ", epoch, "Train Loss: ", total_loss / total_batches)
@@ -84,7 +84,7 @@ def eval_model(model, eval_loader, device, epoch):
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         outputs = model(images, targets)
         loss = sum(loss for loss in outputs.values())
-        total_loss += loss.item() / images.size(0)
+        total_loss += loss.sum().item() / images.size(0)
         total_batches += 1
 
     print("Epoch: ", epoch, "Eval Loss: ", total_loss / total_batches)
