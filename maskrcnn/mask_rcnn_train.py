@@ -10,6 +10,7 @@ from dataset import MaskRCNNDataset, mrcnn_collate_fn
 from torch.utils.data import DataLoader
 import wandb
 import gc
+import time
 import argparse
 
 
@@ -105,6 +106,7 @@ if __name__ == "__main__":
     print("Number of GPUs: ", num_gpus)
     if num_gpus > 1:
         batch_size = batch_size * num_gpus
+        num_workers = num_workers * num_gpus
 
     # load an instance segmentation model pre-trained pre-trained on COCO
     model = torchvision.models.detection.maskrcnn_resnet50_fpn(
@@ -123,9 +125,9 @@ if __name__ == "__main__":
     num_epochs = params["num_epochs"]
 
     transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
-                             0.0571, 0.0567, 0.0614])
+        transforms.ToTensor()
+        # transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+        #                      0.0571, 0.0567, 0.0614])
     ])
 
     wandb.init(
@@ -142,9 +144,9 @@ if __name__ == "__main__":
         data_dir=params["data_dir"], split='val', transforms=transform)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True, collate_fn=mrcnn_collate_fn, num_workers=0)
+                              shuffle=True, collate_fn=mrcnn_collate_fn, num_workers=num_workers)
     eval_loader = DataLoader(eval_dataset, batch_size=batch_size,
-                             shuffle=False, collate_fn=mrcnn_collate_fn, num_workers=0)
+                             shuffle=False, collate_fn=mrcnn_collate_fn, num_workers=num_workers)
 
     optimizer = torch.optim.AdamW(
         params=model.parameters(), lr=params["learning_rate"])
@@ -155,11 +157,13 @@ if __name__ == "__main__":
     minm_loss = 100000000.0
 
     for epoch in range(num_epochs):
+        start_time  = time.time()
         train_loss = train_model(model, train_loader, optimizer, device, epoch)
+        epoch_time = time.time() - start_time
         torch.cuda.empty_cache()
         loss = eval_model(model, eval_loader, device, epoch)
         torch.cuda.empty_cache()
-        wandb.log({"train_loss": train_loss, "eval_loss": loss})
+        wandb.log({"train_loss": train_loss, "eval_loss": loss, "epoch_time": epoch_time})
         gc.collect()
         if loss < minm_loss:
             minm_loss = loss
