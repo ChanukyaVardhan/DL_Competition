@@ -22,9 +22,13 @@ __pycache__
 !docs/**/*.png
 imdb
 data
+Dataset*
 .jekyll-cache
 _site
 .vscode
+*.Identifier
 
 # wandb
 wandb*
+*.ninja
+.ninja_*
