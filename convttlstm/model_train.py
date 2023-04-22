@@ -13,6 +13,7 @@ import time
 # computer vision/image processing modules 
 import torchvision
 import skimage.metrics
+import cv2
 
 # math/probability modules
 import random
@@ -36,6 +37,18 @@ torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
+
+mean = [0.5061, 0.5045, 0.5008]
+std = [0.0571, 0.0567, 0.0614]
+unnormalize_transform = transforms.Normalize(
+    mean=[-m/s for m, s in zip(mean, std)],
+    std=[1/s for s in std])
+
+def unnormalize(img):
+    unnormalized_image = unnormalize_transform(img)
+    unnormalized_image = transforms.ToPILImage()(unnormalized_image)
+    return unnormalized_image
+
 
 def main(args):
     ## Distributed computing
@@ -86,7 +99,7 @@ def main(args):
 
     # DATA_DIR = os.path.join("./data", 
     #     {"MNIST": "mnist", "KTH": "kth"}[args.dataset])
-    DATA_DIR = "../data/"
+    DATA_DIR = "/vast/snm6477/DL_Finals/Dataset_Student"
 
     # batch size for each process
     total_batch_size  = args.batch_size
@@ -192,6 +205,20 @@ def main(args):
             model = DDP(model, device_ids = [args.local_rank])
 
     best_model_path = "./checkpoints/convttlstm_best.pt"
+    
+    cache = {}
+    def plot_reconstructed_image(image, prefix):
+        # Plot the two images side by side
+        if prefix not in cache:
+            cache[prefix] = 0
+        else:
+            cache[prefix] += 1
+            
+#         cv2.imwrite(f"./viz_images/{prefix}_{cache[prefix]}.png", image)
+        image.save(f"./viz_images/{prefix}_{cache[prefix]}.png","PNG")
+
+        wandb.log({prefix + " Images": wandb.Image(image)})
+
     for epoch in range(1, args.num_epochs + 1):
         print(f"Training Epoch - {epoch}")
 
@@ -199,14 +226,16 @@ def main(args):
         start_time  = time.time()
         model.train()
         samples, LOSS = 0., 0.
-        for frames in train_loader:
+        for it, frames in enumerate(train_loader):
             samples += total_batch_size
 
             frames = frames.permute(0, 1, 4, 2, 3).cuda()
+            viz_gt = unnormalize(frames[0][-1])
+            
             inputs = frames[:, :-1]
             origin = frames[:, -args.output_frames:]
 
-            if arg.use_amp:
+            if args.use_amp:
                 with autocast(dtype = torch.float16):
                     pred = model(inputs, 
                         input_frames  =  args.input_frames, 
@@ -234,7 +263,7 @@ def main(args):
             optimizer.zero_grad()
 
             LOSS += reduced_loss.item() * total_batch_size
-            
+                    
             if args.use_amp:
                 # with amp.scale_loss(loss, optimizer) as scaled_loss:
                     # scaled_loss.backward()
@@ -254,18 +283,23 @@ def main(args):
                 scaler.update()
             else:
                 optimizer.step()
-            
 
+            viz_pred = unnormalize(pred[0][-1].detach())
+            if it %1000 == 0:
+                plot_reconstructed_image(viz_gt, "Train Ground truth")
+                plot_reconstructed_image(viz_pred, "Train Pred")
+                
             if args.local_rank == 0:
-                print('Epoch: {}/{}, Training: {}/{}, Loss: {}'.format(
-                    epoch, args.num_epochs, samples, train_samples, reduced_loss.item()))
+#                 print('Epoch: {}/{}, Training: {}/{}, Loss: {}'.format(
+#                     epoch, args.num_epochs, samples, train_samples, reduced_loss.item()))
+                wandb.log({"Train Loss": reduced_loss.item()})
 
         # LOG TRAIN LOSS
         LOSS /= samples
         torch.cuda.empty_cache()
         train_time  = time.time() - start_time
         print(f"Training Loss - {LOSS:.4f}, Training Time - {train_time:.2f} secs")
-        wandb.log({"Train Loss": LOSS, "Eval Loss": LOSS})
+#         wandb.log({"Train Loss": LOSS})
 
         ## Phase 2: Evaluation on the validation set
         start_time  = time.time()
@@ -274,8 +308,10 @@ def main(args):
             samples, LOSS = 0., 0.
             for it, frames in enumerate(valid_loader):
                 samples += total_batch_size
-
+                
                 frames = frames.permute(0, 1, 4, 2, 3).cuda()
+                viz_gt = unnormalize(frames[0][-1])
+
                 inputs = frames[:,  :args.input_frames]
                 origin = frames[:, -args.output_frames:]
 
@@ -285,7 +321,9 @@ def main(args):
                     output_frames = args.output_frames, 
                     teacher_forcing = False, 
                     checkpointing   = False)
-
+                
+                viz_pred = unnormalize(pred[0][-1].detach())
+                
                 loss = loss_func(pred, origin)
 
                 if args.distributed:
@@ -294,6 +332,10 @@ def main(args):
                     reduced_loss = loss.data
 
                 LOSS += reduced_loss.item() * total_batch_size
+                
+                if it %100 == 0:
+                    plot_reconstructed_image(viz_gt, "Val Ground truth")
+                    plot_reconstructed_image(viz_pred, "Val Pred")                    
 
             LOSS /= valid_samples
 
