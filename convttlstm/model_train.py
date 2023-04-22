@@ -44,12 +44,15 @@ std = [0.0571, 0.0567, 0.0614]
 unnormalize_transform = transforms.Compose([
     transforms.Normalize(
         mean=[-m/s for m, s in zip(mean, std)], std=[1/s for s in std]),
-    transforms.ToPILImage()])
+])
+to_pil = transforms.ToPILImage()
 
 
 def unnormalize(img):
     unnormalized_image = unnormalize_transform(img)
-    return unnormalized_image
+    pil_images = [to_pil(img) for img in unnormalized_image]
+
+    return pil_images
 
 
 def main(args):
