@@ -16,7 +16,7 @@ singularity exec --nv \
 
 source /ext3/env.sh
 cd /scratch/snm6477/github/DL_Competition/convttlstm
-python3 model_train.py --use_distributed --batch_size=4 --no_sigmoid --valid_samples=500 --num_epochs=10 --future_frames=11 --output_frames=11 --use_amp --gradient_clipping --train_samples_epoch 3000
+python3 -m torch.distributed.launch --nproc_per_node=2 model_train.py --use_distributed --batch_size=4 --no_sigmoid --valid_samples=500 --num_epochs=10 --future_frames=11 --output_frames=11 --use_amp --gradient_clipping --train_samples_epoch 3000
 
 "
 

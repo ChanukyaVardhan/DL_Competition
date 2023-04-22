@@ -360,7 +360,7 @@ def main(args):
 
                 LOSS += reduced_loss.item() * total_batch_size
 
-                if it % 50 == 0:
+                if args.local_rank == 0 and it % 50 == 0:
                     #                     plot_reconstructed_image(viz_gt, "Val Ground truth")
                     #                     plot_reconstructed_image(viz_pred, "Val Pred")
                     plot_reconstructed_image(
