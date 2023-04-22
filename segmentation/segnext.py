@@ -122,5 +122,8 @@ def count_parameters(model):
 
 
 if __name__ == '__main__':
-    model = ModifiedSegNeXT(10, 512, 256, 8, 8)
-    print(count_parameters(model))
+    segnext_model = SegNeXT(49)
+    print(count_parameters(segnext_model))
+    input_frames = torch.randn(2, 3, 160, 240)
+    output = segnext_model(input_frames)
+    print(output.shape)

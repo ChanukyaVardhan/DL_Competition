@@ -20,11 +20,13 @@ class TestDataset(Dataset):
         self.path = self.data_dir + "train"
         self.video_paths = self.video_paths + [os.path.join(self.path, v) for v in os.listdir(self.path) if os.path.isdir(os.path.join(self.path, v))]
         self.video_paths.sort()
+
+        # self.video_paths = self.video_paths[6900:]
         
         self.transform = transforms.Compose([
             transforms.ToTensor()
         ])
-    
+    # 13268, 13534, 13688, 14125
     def __len__(self):
         return len(self.video_paths)
     
@@ -46,7 +48,7 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, num_workers=2)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 h, w = 0, 0
 for batch_idx, (inputs, vpath) in enumerate(trainloader):
-    
+    print(vpath)
     if (batch_idx+1) % 100 == 0:
         print(f"Completed mean for {(batch_idx+1)} videos!")
     

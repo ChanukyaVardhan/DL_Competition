@@ -1,4 +1,5 @@
 import os
+import random
 import numpy as np
 from PIL import Image
 import torch
@@ -8,7 +9,7 @@ import torchvision.transforms as transforms
 
 class CLEVRERSegDataset(Dataset):
 
-    def __init__(self, data_dir='./data/', split='train', user_transforms=None):
+    def __init__(self, data_dir='./data/', split='train', user_transforms=None, num_samples=None):
         self.data_dir = data_dir
         self.split = split
 
@@ -19,6 +20,9 @@ class CLEVRERSegDataset(Dataset):
 
         self.image_paths = [os.path.join(vpath, f"image_{i}.png") for i in range(
             22) for vpath in self.video_paths]
+
+        if split == 'val' and num_samples is not None:
+            self.image_paths = random.sample(self.image_paths, num_samples)
 
         self.transforms = user_transforms
 

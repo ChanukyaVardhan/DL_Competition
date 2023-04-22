@@ -26,6 +26,9 @@ Dataset*
 .jekyll-cache
 _site
 .vscode
+*.Identifier
 
 # wandb
 wandb*
+*.ninja
+.ninja_*

@@ -4,16 +4,19 @@ import os
 import torch
 import torchmetrics
 import time
+import numpy as np
 import gc
+from tqdm import tqdm
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 from torchvision import transforms
 
 from dataloader import CLEVRERSegDataset
 from segmentation import SegNeXT
 from main import get_save_paths_prefix, get_save_paths
-
+from utils import class_labels
+import matplotlib.pyplot as plt
 import wandb
 
 
@@ -21,12 +24,15 @@ def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
+    parser.add_argument("--save_every",  default=False, action="store_true",
+                        help="Flag to save every few epochs to True.")
     args = parser.parse_args()
 
     with open(args.config_path, "r") as f:
         params = yaml.load(f, Loader=yaml.SafeLoader)
     params["experiment"] = os.path.splitext(
         os.path.basename(args.config_path))[0]
+    params["is_save_every"] = args.save_every
 
     return params
 
@@ -38,14 +44,23 @@ def get_batch_entries(batch, device):
     return input_images, gt_mask
 
 
+def plot_masks(pred_mask, gt_mask, image, idx):
+    # Plot the predicted mask and the ground truth mask side by side with the IoU score
+    image = image.astype(np.uint8).transpose(1, 2, 0)
+
+    return wandb.Image(image, masks={
+        "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
+        "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
+    })
+
+
 def train_epoch(model, optimizer, criterion, train_loader, device, params):
     model.train()
     train_loss = 0.0
-    num_samples = 0
+    num_batches = len(train_loader)
 
-    for i, batch in enumerate(train_loader):
+    for i, batch in tqdm(enumerate(train_loader)):
         input_images, gt_mask = get_batch_entries(batch, device)
-        batch_size = input_images.shape[0]
 
         optimizer.zero_grad()
 
@@ -57,9 +72,16 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
         loss.backward()
         optimizer.step()
 
-    num_samples += batch_size
+        if (i == 0):
+            pred_mask = torch.argmax(output_mask, dim=1)
+            mask = plot_masks(pred_mask[0].cpu().numpy(),
+                              gt_mask[0].cpu().numpy(), input_images[0].cpu.numpy(), i)
+            wandb.log({"train_predictions": mask})
+            jaccard = torchmetrics.JaccardIndex(
+                task="multiclass", num_classes=49).to(device)
+            wandb.log({"Train mIoU": jaccard(pred_mask[0], gt_mask[0])})
 
-    train_loss /= num_samples
+    train_loss /= num_batches
 
     return train_loss
 
@@ -67,28 +89,32 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
 def eval_epoch(model, criterion, eval_loader, device, params):
     model.eval()
     eval_loss = 0.0
-    num_samples = 0
+    num_batches = len(train_loader)
 
-    mIoU = 0.0
-    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
-    for i, batch in enumerate(eval_loader):
-        input_images, gt_mask = get_batch_entries(batch, device)
-        batch_size = input_images.shape[0]
+    with torch.no_grad():
+        for i, batch in tqdm(enumerate(eval_loader)):
+            input_images, gt_mask = get_batch_entries(batch, device)
+            batch_size = input_images.shape[0]
 
-        output_mask = model(input_images)
-        loss = criterion(output_mask, gt_mask)
+            output_mask = model(input_images)
+            loss = criterion(output_mask, gt_mask)
 
-        eval_loss += loss.item()
-        # COMPUTE mIoU
-        pred_mask = torch.argmax(output_mask, dim=1)
-        mIoU += jaccard(pred_mask, gt_mask)
+            eval_loss += loss.item()
+            # COMPUTE mIoU
+            pred_mask = torch.argmax(output_mask, dim=1)
+            # mIoU += jaccard(pred_mask, gt_mask)
 
-        num_samples += batch_size
+            if (i == 0):
+                mask = plot_masks(pred_mask[0].cpu().numpy(),
+                                  gt_mask[0].cpu().numpy(), input_images[0].cpu.numpy(), i)
+                wandb.log({"eval_predictions": mask})
+                jaccard = torchmetrics.JaccardIndex(
+                    task="multiclass", num_classes=49).to(device)
+                wandb.log({"val mIoU": jaccard(pred_mask[0], gt_mask[0])})
 
-    eval_loss /= num_samples
-    mIoU /= num_samples
+    eval_loss /= num_batches
 
-    return eval_loss, mIoU
+    return eval_loss
 
 
 def train_model(model, optimizer, criterion, train_loader, eval_loader, device, params):
@@ -125,17 +151,18 @@ def train_model(model, optimizer, criterion, train_loader, eval_loader, device, 
         print(
             f"Training Loss - {train_loss:.4f}, Training Time - {train_time:.2f} secs")
 
+        wandb.log({"Train Loss": train_loss, "Train Time": train_time})
+
         start_time = time.time()
-        eval_loss, mIoU = eval_epoch(
+        eval_loss = eval_epoch(
             model, criterion, eval_loader, device, params)
         torch.cuda.empty_cache()
         eval_time = time.time() - start_time
         print(f"Eval Loss - {eval_loss:.4f}, Eval Time - {eval_time:.2f} secs")
 
-        gc.collect()
+        wandb.log({"Eval Loss": eval_loss, "Eval Time": eval_time})
 
-        wandb.log({"Train Loss": train_loss, "Eval Loss": eval_loss,
-                  "Train Time": train_time, "Eval Time": eval_time, "mIoU": mIoU})
+        gc.collect()
 
         if eval_loss < best_eval_loss:
             best_eval_loss = eval_loss
@@ -184,8 +211,8 @@ if __name__ == "__main__":
 
     transform = transforms.Compose([
         transforms.ToTensor(),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.RandomVerticalFlip(),
+        #         transforms.RandomHorizontalFlip(),
+        #         transforms.RandomVerticalFlip(),
         # transforms.RandomResizedCrop(size = 224, scale = (0.8, 1.0), ratio = (0.8, 1.2)),
         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                              0.0571, 0.0567, 0.0614])
@@ -198,10 +225,11 @@ if __name__ == "__main__":
     val_dataset = CLEVRERSegDataset(
         data_dir=data_dir, split='val', user_transforms=transform)
 
+    print(len(train_dataset), len(val_dataset))
     train_loader = DataLoader(
         train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
     eval_loader = DataLoader(
-        val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
+        val_dataset, batch_size=params["batch_size"]*3, shuffle=False, num_workers=params["num_workers"])
 
     model = SegNeXT(params["num_classes"], weights=None)
     model = model.to(device)
@@ -209,7 +237,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(params["lr"]))
     # Define class weights. Les weight for background class. Total 49 classes where 0 is background
     class_weights = torch.ones(params["num_classes"]).to(device)
-    class_weights[0] = 0.2
+    class_weights[0] = 0.4
 
     criterion = torch.nn.CrossEntropyLoss(
         weight=class_weights, ignore_index=255)
