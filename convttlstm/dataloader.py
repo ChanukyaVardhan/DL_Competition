@@ -45,7 +45,7 @@ class OUR_Dataset(Dataset):
 
     def __getitem__(self, index):
         video_path      = self.video_paths[index]
-
+    
         # FIX THIS FOR TEST SET
         if self.predict_final:
             frames = [i for i in range(0, 11)] + [21]
@@ -63,7 +63,9 @@ class OUR_Dataset(Dataset):
         # 4th order: num_frames(0) x img_height(1) x img_width(2) x img_channel(3) : 22 x 160 x 240 x 3
         input_images    = input_images.permute(0, 2, 3, 1)
 
-        return input_images
+        _, video_name = os.path.split(video_path)
+        
+        return input_images, video_name
 
 class MNIST_Dataset(Dataset):
 

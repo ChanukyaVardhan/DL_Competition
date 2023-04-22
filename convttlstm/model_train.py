@@ -207,17 +207,25 @@ def main(args):
     best_model_path = "./checkpoints/convttlstm_best.pt"
     
     cache = {}
-    def plot_reconstructed_image(image, prefix):
-        # Plot the two images side by side
-        if prefix not in cache:
-            cache[prefix] = 0
-        else:
-            cache[prefix] += 1
-            
-#         cv2.imwrite(f"./viz_images/{prefix}_{cache[prefix]}.png", image)
-        image.save(f"./viz_images/{prefix}_{cache[prefix]}.png","PNG")
 
-        wandb.log({prefix + " Images": wandb.Image(image)})
+#     def plot_reconstructed_image(image, prefix):
+#         # Plot the two images side by side
+#         if prefix not in cache:
+#             cache[prefix] = 0
+#         else:
+#             cache[prefix] += 1
+            
+# #         cv2.imwrite(f"./viz_images/{prefix}_{cache[prefix]}.png", image)
+#         image.save(f"./viz_images/{prefix}_{cache[prefix]}.png","PNG")
+
+#         wandb.log({prefix + " Images": wandb.Image(image)})
+
+    def plot_reconstructed_image(gt_image, pred_image, prefix, ID):
+        # Plot the two images side by side
+        table = wandb.Table(columns=["Video", "Ground Truth", "Reconstructed"])
+        table.add_data(ID, wandb.Image(gt_image), wandb.Image(pred_image))
+
+        wandb.log({f"{prefix} Reconstructed Images": table})
 
     for epoch in range(1, args.num_epochs + 1):
         print(f"Training Epoch - {epoch}")
@@ -226,11 +234,11 @@ def main(args):
         start_time  = time.time()
         model.train()
         samples, LOSS = 0., 0.
-        for it, frames in enumerate(train_loader):
+        for it, (frames, video_names) in enumerate(train_loader):
             samples += total_batch_size
-
+            viz_batch = 0
             frames = frames.permute(0, 1, 4, 2, 3).cuda()
-            viz_gt = unnormalize(frames[0][-1])
+            viz_gt = unnormalize(frames[viz_batch][-1])
             
             inputs = frames[:, :-1]
             origin = frames[:, -args.output_frames:]
@@ -284,10 +292,11 @@ def main(args):
             else:
                 optimizer.step()
 
-            viz_pred = unnormalize(pred[0][-1].detach())
-            if it %1000 == 0:
-                plot_reconstructed_image(viz_gt, "Train Ground truth")
-                plot_reconstructed_image(viz_pred, "Train Pred")
+            viz_pred = unnormalize(pred[viz_batch][-1].detach())
+            if it %100 == 0:
+#                 plot_reconstructed_image(viz_gt, "Train Ground truth")
+#                 plot_reconstructed_image(viz_pred, "Train Pred")
+                plot_reconstructed_image(viz_gt, viz_pred, "Train", video_names[viz_batch])
                 
             if args.local_rank == 0:
 #                 print('Epoch: {}/{}, Training: {}/{}, Loss: {}'.format(
@@ -308,9 +317,9 @@ def main(args):
             samples, LOSS = 0., 0.
             for it, frames in enumerate(valid_loader):
                 samples += total_batch_size
-                
+                viz_batch = 0
                 frames = frames.permute(0, 1, 4, 2, 3).cuda()
-                viz_gt = unnormalize(frames[0][-1])
+                viz_gt = unnormalize(frames[viz_batch][-1])
 
                 inputs = frames[:,  :args.input_frames]
                 origin = frames[:, -args.output_frames:]
@@ -322,7 +331,7 @@ def main(args):
                     teacher_forcing = False, 
                     checkpointing   = False)
                 
-                viz_pred = unnormalize(pred[0][-1].detach())
+                viz_pred = unnormalize(pred[viz_batch][-1].detach())
                 
                 loss = loss_func(pred, origin)
 
@@ -334,8 +343,10 @@ def main(args):
                 LOSS += reduced_loss.item() * total_batch_size
                 
                 if it %100 == 0:
-                    plot_reconstructed_image(viz_gt, "Val Ground truth")
-                    plot_reconstructed_image(viz_pred, "Val Pred")                    
+#                     plot_reconstructed_image(viz_gt, "Val Ground truth")
+#                     plot_reconstructed_image(viz_pred, "Val Pred")
+                    plot_reconstructed_image(viz_gt, viz_pred, "Val", video_names[viz_batch])
+                    
 
             LOSS /= valid_samples
 
@@ -374,13 +385,13 @@ def main(args):
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= args.lr_decay_rate
 
-    final_model_path = f"./checkpoints/convttlstm_{epoch - 1}.pt"
-    if args.local_rank == 0:
-        print(f"Saving model after {epoch} epochs")
-        torch.save({
-            "epoch":            epoch,
-            "model":            model.state_dict(),
-        }, final_model_path)
+        final_model_path = f"./checkpoints/convttlstm_{epoch}.pt"
+        if args.local_rank == 0:
+            print(f"Saving model after {epoch} epochs")
+            torch.save({
+                "epoch":            epoch,
+                "model":            model.state_dict(),
+            }, final_model_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "Conv-TT-LSTM Training")
