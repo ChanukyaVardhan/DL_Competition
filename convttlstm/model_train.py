@@ -71,7 +71,7 @@ def main(args):
 
         # os.environ['WORLD_SIZE']
         # set world size to number of devices
-        os.environ['WORLD_SIZE'] = num_devices
+        os.environ['WORLD_SIZE'] = str(num_devices)
         print("WORLD_SIZE", os.environ['WORLD_SIZE'])
         world_size = torch.distributed.get_world_size()
         print('num_devices', num_devices,
