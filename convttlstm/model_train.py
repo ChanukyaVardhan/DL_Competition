@@ -66,15 +66,23 @@ def create_collage(images, width, height):
     return collage
 
 
-def plot_reconstructed_image(gt_images, pred_images, prefix, ID):
-    # Plot the two images side by side
-    table = wandb.Table(columns=["Video", "Ground Truth", "Reconstructed"])
-    num_images = len(gt_images)
-    gt_collage = create_collage(gt_images, 160*num_images/2, 240)
-    pred_collage = create_collage(pred_images, 256, 256)
-    table.add_data(ID, wandb.Image(gt_collage), wandb.Image(pred_collage))
+# def plot_reconstructed_image(gt_images, pred_images, prefix, ID):
+#     # Plot the two images side by side
+#     table = wandb.Table(columns=["Video", "Ground Truth", "Reconstructed"])
+#     num_images = len(gt_images)
+#     gt_collage = create_collage(gt_images, 160*num_images//2, 240)
+#     pred_collage = create_collage(pred_images, 160*num_images//2, 256)
+#     table.add_data(ID, wandb.Image(gt_collage), wandb.Image(pred_collage))
 
-    wandb.log({f"{prefix} Reconstructed Images": table})
+#     wandb.log({f"{prefix} Reconstructed Images": table})
+
+
+def plot_reconstructed_image(images, prefix, ID):
+    # Plot the two images side by side
+    num_images = len(images)
+    collage = create_collage(images, 160*num_images//2, 240)
+
+    wandb.log({prefix + " Images": wandb.Image(collage, caption=ID)})
 
 
 def main(args):
@@ -331,10 +339,12 @@ def main(args):
 
             viz_pred = unnormalize(pred[viz_batch].detach())
             if args.local_rank == 0 and it % 100 == 0:
-                #                 plot_reconstructed_image(viz_gt, "Train Ground truth")
-                #                 plot_reconstructed_image(viz_pred, "Train Pred")
                 plot_reconstructed_image(
-                    viz_gt, viz_pred, "Train", video_names[viz_batch])
+                    viz_gt, "Train Ground truth", video_names[viz_batch])
+                plot_reconstructed_image(
+                    viz_pred, "Train Pred", video_names[viz_batch])
+                # plot_reconstructed_image(
+                #     viz_gt, viz_pred, "Train", video_names[viz_batch])
 
             if args.local_rank == 0 and it % 100 == 0:
                 #                 print('Epoch: {}/{}, Training: {}/{}, Loss: {}'.format(
@@ -382,10 +392,12 @@ def main(args):
                 LOSS += reduced_loss.item() * total_batch_size
 
                 if args.local_rank == 0 and it % 50 == 0:
-                    #                     plot_reconstructed_image(viz_gt, "Val Ground truth")
-                    #                     plot_reconstructed_image(viz_pred, "Val Pred")
                     plot_reconstructed_image(
-                        viz_gt, viz_pred, "Val", video_names[viz_batch])
+                        viz_gt, "Val Ground truth", video_names[viz_batch])
+                    plot_reconstructed_image(
+                        viz_pred, "Val Pred", video_names[viz_batch])
+                    # plot_reconstructed_image(
+                    #     viz_gt, viz_pred, "Val", video_names[viz_batch])
                     wandb.log({"Eval Loss": LOSS})
 
             LOSS /= valid_samples
