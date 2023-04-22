@@ -174,10 +174,11 @@ def main(args):
 
     valid_samples = len(valid_loader) * total_batch_size
 
-    wandb.init(
-        entity="dl_competition",
-        config=args,
-    )
+    if args.local_rank == 0:
+        wandb.init(
+            entity="dl_competition",
+            config=args,
+        )
 
     # Main script for training and validation
 
@@ -254,7 +255,7 @@ def main(args):
             samples += total_batch_size
             viz_batch = 0
             frames = frames.permute(0, 1, 4, 2, 3).cuda()
-            viz_gt = unnormalize(frames[viz_batch][-1])
+            viz_gt = unnormalize(frames[viz_batch])
 
             inputs = frames[:, :-1]
             origin = frames[:, -args.output_frames:]
@@ -308,7 +309,7 @@ def main(args):
             else:
                 optimizer.step()
 
-            viz_pred = unnormalize(pred[viz_batch][-1].detach())
+            viz_pred = unnormalize(pred[viz_batch].detach())
             if it % 100 == 0:
                 #                 plot_reconstructed_image(viz_gt, "Train Ground truth")
                 #                 plot_reconstructed_image(viz_pred, "Train Pred")
