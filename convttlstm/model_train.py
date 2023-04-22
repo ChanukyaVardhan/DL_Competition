@@ -80,7 +80,7 @@ def create_collage(images, width, height):
 def plot_reconstructed_image(images, prefix, ID):
     # Plot the two images side by side
     num_images = len(images)
-    collage = create_collage(images, 160*num_images//2, 240)
+    collage = create_collage(images, 160*num_images//2, 240//2)
 
     wandb.log({prefix + " Images": wandb.Image(collage, caption=ID)})
 
@@ -567,7 +567,7 @@ if __name__ == "__main__":
     # Learning algorithm
     parser.add_argument('--num_epochs', default=500, type=int,
                         help='Number of total epochs in training.')
-    parser.add_argument('--decay_log_epochs', default=20, type=int,
+    parser.add_argument('--decay_log_epochs', default=0, type=int,
                         help='The window size to determine automatic scheduling.')
 
     # gradient clipping
