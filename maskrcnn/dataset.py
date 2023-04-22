@@ -47,8 +47,19 @@ class MaskRCNNDataset(Dataset):
 
         # print("objss : ", obj_ids.shape)
 
-        boxes = masks_to_boxes(masks).long()
-        return masks, obj_ids, boxes
+        boxes = masks_to_boxes(masks).float()
+        better_boxes = None
+        N = boxes.size(0)
+        for obj in range(N):
+            if (boxes[obj][0] < boxes[obj][2] and boxes[obj][1] < boxes[obj][3]):
+                if better_boxes is None:
+                    better_boxes = boxes[obj].unsqueeze(0)
+                else:
+                    better_boxes = torch.cat((better_boxes, boxes[obj].unsqueeze(0)))
+        
+        assert(better_boxes is not None)
+        # print("better_boxes : ", better_boxes.size(0), " -------  ", boxes.size(0))
+        return masks, obj_ids, better_boxes
 
     def __getitem__(self, index):
         image_path = self.image_paths[index]

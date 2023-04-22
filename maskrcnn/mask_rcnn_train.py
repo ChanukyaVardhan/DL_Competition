@@ -10,6 +10,7 @@ from dataset import MaskRCNNDataset, mrcnn_collate_fn
 from torch.utils.data import DataLoader
 import wandb
 import gc
+import time
 import argparse
 
 
@@ -64,9 +65,9 @@ def train_model(model, train_loader, optimizer, device, epoch):
         optimizer.zero_grad()
         outputs = model(images, targets)
         loss = sum(loss for loss in outputs.values())
-        loss.backward()
+        loss.sum().backward()
         optimizer.step()
-        total_loss += loss.item() / images.size(0)
+        total_loss += loss.sum().item() / images.size(0)
         total_batches += 1
 
     print("Epoch: ", epoch, "Train Loss: ", total_loss / total_batches)
@@ -83,7 +84,7 @@ def eval_model(model, eval_loader, device, epoch):
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         outputs = model(images, targets)
         loss = sum(loss for loss in outputs.values())
-        total_loss += loss.item() / images.size(0)
+        total_loss += loss.sum().item() / images.size(0)
         total_batches += 1
 
     print("Epoch: ", epoch, "Eval Loss: ", total_loss / total_batches)
@@ -105,6 +106,7 @@ if __name__ == "__main__":
     print("Number of GPUs: ", num_gpus)
     if num_gpus > 1:
         batch_size = batch_size * num_gpus
+        num_workers = num_workers * num_gpus
 
     # load an instance segmentation model pre-trained pre-trained on COCO
     model = torchvision.models.detection.maskrcnn_resnet50_fpn(
@@ -112,7 +114,7 @@ if __name__ == "__main__":
     # get number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(
-        in_features, num_classes=48)  # replace the pre-trained head with a new one
+        in_features, num_classes=49)  # replace the pre-trained head with a new one
     model = torch.nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
@@ -142,9 +144,9 @@ if __name__ == "__main__":
         data_dir=params["data_dir"], split='val', transforms=transform)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True, collate_fn=mrcnn_collate_fn, num_workers=0)
+                              shuffle=True, collate_fn=mrcnn_collate_fn, num_workers=num_workers)
     eval_loader = DataLoader(eval_dataset, batch_size=batch_size,
-                             shuffle=False, collate_fn=mrcnn_collate_fn, num_workers=0)
+                             shuffle=False, collate_fn=mrcnn_collate_fn, num_workers=num_workers)
 
     optimizer = torch.optim.AdamW(
         params=model.parameters(), lr=params["learning_rate"])
@@ -155,11 +157,13 @@ if __name__ == "__main__":
     minm_loss = 100000000.0
 
     for epoch in range(num_epochs):
+        start_time  = time.time()
         train_loss = train_model(model, train_loader, optimizer, device, epoch)
+        epoch_time = time.time() - start_time
         torch.cuda.empty_cache()
         loss = eval_model(model, eval_loader, device, epoch)
         torch.cuda.empty_cache()
-        wandb.log({"train_loss": train_loss, "eval_loss": loss})
+        wandb.log({"train_loss": train_loss, "eval_loss": loss, "epoch_time": epoch_time})
         gc.collect()
         if loss < minm_loss:
             minm_loss = loss
