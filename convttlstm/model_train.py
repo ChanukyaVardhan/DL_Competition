@@ -41,14 +41,14 @@ torch.backends.cudnn.deterministic = True
 
 mean = [0.5061, 0.5045, 0.5008]
 std = [0.0571, 0.0567, 0.0614]
-unnormalize_transform = transforms.Normalize(
-    mean=[-m/s for m, s in zip(mean, std)],
-    std=[1/s for s in std])
+unnormalize_transform = transforms.Compose([
+    transforms.Normalize(
+        mean=[-m/s for m, s in zip(mean, std)], std=[1/s for s in std]),
+    transforms.ToPILImage()])
 
 
 def unnormalize(img):
     unnormalized_image = unnormalize_transform(img)
-    unnormalized_image = transforms.ToPILImage()(unnormalized_image)
     return unnormalized_image
 
 
