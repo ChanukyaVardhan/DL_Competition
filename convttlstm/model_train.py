@@ -306,7 +306,7 @@ def main(args):
                 plot_reconstructed_image(
                     viz_gt, viz_pred, "Train", video_names[viz_batch])
 
-            if args.local_rank == 0:
+            if args.local_rank == 0 and it % 100 == 0:
                 #                 print('Epoch: {}/{}, Training: {}/{}, Loss: {}'.format(
                 #                     epoch, args.num_epochs, samples, train_samples, reduced_loss.item()))
                 wandb.log({"Train Loss": reduced_loss.item()})
@@ -351,11 +351,12 @@ def main(args):
 
                 LOSS += reduced_loss.item() * total_batch_size
 
-                if it % 100 == 0:
+                if it % 50 == 0:
                     #                     plot_reconstructed_image(viz_gt, "Val Ground truth")
                     #                     plot_reconstructed_image(viz_pred, "Val Pred")
                     plot_reconstructed_image(
                         viz_gt, viz_pred, "Val", video_names[viz_batch])
+                wandb.log({"Eval Loss": LOSS})
 
             LOSS /= valid_samples
 
@@ -365,7 +366,6 @@ def main(args):
             torch.cuda.empty_cache()
             eval_time = time.time() - start_time
             print(f"Eval Loss - {LOSS:.4f}, Eval Time - {eval_time:.2f} secs")
-            wandb.log({"Eval Loss": LOSS})
 
             if LOSS < min_loss:
                 min_epoch, min_loss = epoch, LOSS
