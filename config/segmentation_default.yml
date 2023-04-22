@@ -4,6 +4,7 @@ is_pretrain:        True            # Falg to decide pretraining
 cnn_encoder:        "resnet18"      # CNN Encoder for each image frame
 n_layers:           6               # Number of transformer layers
 dropout:            0.              # Dropout value
+test_checkpoint:    "./checkpoints/segmentation_default_pretrain_model.pt"
 
 
 # data
