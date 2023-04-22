@@ -25,6 +25,7 @@ from utils.convlstmnet import ConvLSTMNet
 from dataloader import KTH_Dataset, MNIST_Dataset, OUR_Dataset
 
 from utils.gpu_affinity import set_affinity
+from samplers import CustomDistributedSampler
 # from apex import amp
 from torch.cuda.amp import autocast, GradScaler
 import torchvision.transforms as transforms
@@ -139,8 +140,12 @@ def main(args):
                             predict_alternate=args.predict_alternate)
     print(f"Length of train dataset - {len(train_dataset)}")
 
-    train_sampler = torch.utils.data.distributed.DistributedSampler(
-        train_dataset, num_replicas=world_size, rank=args.local_rank, shuffle=True)
+    # train_sampler = torch.utils.data.distributed.DistributedSampler(
+    #     train_dataset, num_replicas=world_size, rank=args.local_rank, shuffle=True)
+    # Custom sampler that takes only a subset of the dataset
+    train_sampler = CustomDistributedSampler(
+        train_dataset, num_replicas=world_size, rank=args.local_rank, shuffle=True, num_samples=args.train_samples_epoch)
+
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, drop_last=True,
         num_workers=num_devices * 4, pin_memory=True, sampler=train_sampler)
@@ -498,6 +503,8 @@ if __name__ == "__main__":
                         action='store_false',  help='Use unlabeled data as well.')
     parser.set_defaults(use_unlabeled=True)
     parser.add_argument('--train-samples', default=0, type=int,
+                        help='Number of samples to reach from the data dir.')
+    parser.add_argument('--train-samples-epoch', default=None, type=int,
                         help='Number of samples in each training epoch.')
 
     # predict using only the alternate frames
