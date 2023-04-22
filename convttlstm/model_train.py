@@ -314,7 +314,7 @@ def main(args):
                 optimizer.step()
 
             viz_pred = unnormalize(pred[viz_batch].detach())
-            if it % 100 == 0:
+            if args.local_rank == 0 and it % 100 == 0:
                 #                 plot_reconstructed_image(viz_gt, "Train Ground truth")
                 #                 plot_reconstructed_image(viz_pred, "Train Pred")
                 plot_reconstructed_image(
