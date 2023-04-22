@@ -70,6 +70,9 @@ def main(args):
             backend='nccl', init_method='env://')
 
         # os.environ['WORLD_SIZE']
+        # set world size to number of devices
+        os.environ['WORLD_SIZE'] = num_devices
+        print("WORLD_SIZE", os.environ['WORLD_SIZE'])
         world_size = torch.distributed.get_world_size()
         print('num_devices', num_devices,
               'local_rank', args.local_rank,
@@ -241,6 +244,7 @@ def main(args):
 
     for epoch in range(1, args.num_epochs + 1):
         print(f"Training Epoch - {epoch}")
+        train_sampler.set_epoch(epoch)
 
         # Phase 1: Learning on the training set
         start_time = time.time()
@@ -382,6 +386,10 @@ def main(args):
                 }, best_model_path)
 
         # Phase 3: learning rate and scheduling sampling ratio adjustment
+        # scale learning rate and scheduled sampling ratio as per number of GPUs
+        args.lr_decay_rate = args.lr_decay_rate + 0.01*world_size
+        args.ssr_decay_ratio = args.ssr_decay_ratio / world_size
+
         if not ssr_decay_mode and epoch > ssr_decay_start \
                 and epoch > min_epoch + args.decay_log_epochs:
             ssr_decay_mode = True
@@ -414,33 +422,33 @@ if __name__ == "__main__":
     # Devices (Single GPU / Distributed computing)
 
     # whether to use distributed computing
-    parser.add_argument('--use-distributed', dest="distributed",
+    parser.add_argument('--use_distributed', dest="distributed",
                         action='store_true',  help='Use distributed computing in training.')
-    parser.add_argument('--no-distributed',  dest="distributed",
+    parser.add_argument('--no_distributed',  dest="distributed",
                         action='store_false', help='Use single process (GPU) in training.')
     parser.set_defaults(distributed=True)
 
-    parser.add_argument('--use-apex', dest='use_apex',
+    parser.add_argument('--use_apex', dest='use_apex',
                         action='store_true',  help='Use apex.parallel for distributed computing.')
-    parser.add_argument('--no-apex', dest='use_apex',
+    parser.add_argument('--no_apex', dest='use_apex',
                         action='store_false', help='Use torch.nn.distributed for distributed computing.')
     parser.set_defaults(use_apex=False)
 
-    parser.add_argument('--use-amp', dest='use_amp',
+    parser.add_argument('--use_amp', dest='use_amp',
                         action='store_true',  help='Use automatic mixed precision in training.')
-    parser.add_argument('--no-amp', dest='use_amp',
+    parser.add_argument('--no_amp', dest='use_amp',
                         action='store_false', help='No automatic mixed precision in training.')
     parser.set_defaults(use_amp=False)
 
-    parser.add_argument('--use-fused', dest='use_fused',
+    parser.add_argument('--use_fused', dest='use_fused',
                         action='store_true',  help='Use fused kernels in training.')
-    parser.add_argument('--no-fused', dest='use_fused',
+    parser.add_argument('--no_fused', dest='use_fused',
                         action='store_false', help='No fused kernels in training.')
     parser.set_defaults(use_fused=False)
 
-    parser.add_argument('--use-checkpointing', dest='use_checkpointing',
+    parser.add_argument('--use_checkpointing', dest='use_checkpointing',
                         action='store_true',  help='Use checkpointing to reduce memory utilization.')
-    parser.add_argument('--no-checkpointing', dest='use_checkpointing',
+    parser.add_argument('--no_checkpointing', dest='use_checkpointing',
                         action='store_false', help='No checkpointing (faster training).')
     parser.set_defaults(use_checkpointing=False)
 
@@ -449,47 +457,47 @@ if __name__ == "__main__":
     # Data format (batch x steps x height x width x channels)
 
     # batch size (0)
-    parser.add_argument('--batch-size', default=16, type=int,
+    parser.add_argument('--batch_size', default=16, type=int,
                         help='The total batch size in each training iteration.')
 
     # frame split (1)
-    parser.add_argument('--input-frames',  default=11, type=int,
+    parser.add_argument('--input_frames',  default=11, type=int,
                         help='The number of input frames to the model.')
-    parser.add_argument('--future-frames', default=11, type=int,
+    parser.add_argument('--future_frames', default=11, type=int,
                         help='The number of predicted frames of the model.')
-    parser.add_argument('--output-frames', default=11, type=int,
+    parser.add_argument('--output_frames', default=11, type=int,
                         help='The number of output frames of the model.')
 
     # frame format (2, 3, 4)
-    parser.add_argument('--img-height',  default=160, type=int,
+    parser.add_argument('--img_height',  default=160, type=int,
                         help='The image height of each video frame.')
-    parser.add_argument('--img-width',   default=240, type=int,
+    parser.add_argument('--img_width',   default=240, type=int,
                         help='The image width of each video frame.')
-    parser.add_argument('--img-channels', default=3, type=int,
+    parser.add_argument('--img_channels', default=3, type=int,
                         help='The number of channels in each video frame.')
 
-    # Models (Conv-LSTM or Conv-TT-LSTM)
+    # Models (Conv_LSTM or Conv_TT_LSTM)
 
     # model type and size (depth and width)
     parser.add_argument('--model', default='convttlstm', type=str,
                         help='The model is either \"convlstm\", \"convttlstm\".')
 
-    parser.add_argument('--use-sigmoid', dest='use_sigmoid',
+    parser.add_argument('--use_sigmoid', dest='use_sigmoid',
                         action='store_true',  help='Use sigmoid function at the output of the model.')
-    parser.add_argument('--no-sigmoid',  dest='use_sigmoid',
+    parser.add_argument('--no_sigmoid',  dest='use_sigmoid',
                         action='store_false', help='Use output from the last layer as the final output.')
     parser.set_defaults(use_sigmoid=False)  # FIX THIS
 
-    # parameters of the convolutional tensor-train layers
-    parser.add_argument('--model-order', default=3, type=int,
-                        help='The order of the convolutional tensor-train LSTMs.')  # N = 3
-    parser.add_argument('--model-steps', default=3, type=int,
-                        help='The steps of the convolutional tensor-train LSTMs')  # M = 3/5
-    parser.add_argument('--model-ranks', default=8, type=int,
-                        help='The tensor rank of the convolutional tensor-train LSTMs.')  # C(i) = 8
+    # parameters of the convolutional tensor_train layers
+    parser.add_argument('--model_order', default=3, type=int,
+                        help='The order of the convolutional tensor_train LSTMs.')  # N = 3
+    parser.add_argument('--model_steps', default=3, type=int,
+                        help='The steps of the convolutional tensor_train LSTMs')  # M = 3/5
+    parser.add_argument('--model_ranks', default=8, type=int,
+                        help='The tensor rank of the convolutional tensor_train LSTMs.')  # C(i) = 8
 
     # parameters of the convolutional operations
-    parser.add_argument('--kernel-size', default=5, type=int,
+    parser.add_argument('--kernel_size', default=5, type=int,
                         help="The kernel size of the convolutional operations.")  # K = 5
 
     # Dataset (Input to the training algorithm)
@@ -497,64 +505,64 @@ if __name__ == "__main__":
                         help='The dataset name. (Options: KTH, MNIST, OUR)')
 
     # training dataset
-    parser.add_argument('--train-data-file', default='train', type=str,
+    parser.add_argument('--train_data_file', default='train', type=str,
                         help='Name of the folder/file for training set.')
-    parser.add_argument('--no-unlabeled', dest='use_unlabeled',
+    parser.add_argument('--no_unlabeled', dest='use_unlabeled',
                         action='store_false',  help='Use unlabeled data as well.')
     parser.set_defaults(use_unlabeled=True)
-    parser.add_argument('--train-samples', default=0, type=int,
+    parser.add_argument('--train_samples', default=0, type=int,
                         help='Number of samples to reach from the data dir.')
-    parser.add_argument('--train-samples-epoch', default=None, type=int,
+    parser.add_argument('--train_samples_epoch', default=None, type=int,
                         help='Number of samples in each training epoch.')
 
     # predict using only the alternate frames
-    parser.add_argument('--predict-alternate', dest='predict_alternate',
+    parser.add_argument('--predict_alternate', dest='predict_alternate',
                         action='store_true',  help='Use unlabeled data as well.')
     parser.set_defaults(predict_alternate=False)
 
     # predict the 22nd frame directly
-    parser.add_argument('--predict-final', dest='predict_final',
+    parser.add_argument('--predict_final', dest='predict_final',
                         action='store_true',  help='Use unlabeled data as well.')
     parser.set_defaults(predict_final=False)
 
     # validation dataset
-    parser.add_argument('--valid-data-file', default='val', type=str,
+    parser.add_argument('--valid_data_file', default='val', type=str,
                         help='Name of the folder/file for validation set.')
-    parser.add_argument('--valid-samples', default=0, type=int,
+    parser.add_argument('--valid_samples', default=0, type=int,
                         help='Number of unique samples in validation set.')
 
     # Learning algorithm
-    parser.add_argument('--num-epochs', default=500, type=int,
+    parser.add_argument('--num_epochs', default=500, type=int,
                         help='Number of total epochs in training.')
-    parser.add_argument('--decay-log-epochs', default=20, type=int,
+    parser.add_argument('--decay_log_epochs', default=20, type=int,
                         help='The window size to determine automatic scheduling.')
 
     # gradient clipping
-    parser.add_argument('--gradient-clipping', dest='gradient_clipping',
+    parser.add_argument('--gradient_clipping', dest='gradient_clipping',
                         action='store_true',  help='Use gradient clipping in training.')
-    parser.add_argument('--no-clipping', dest='gradient_clipping',
+    parser.add_argument('--no_clipping', dest='gradient_clipping',
                         action='store_false', help='No gradient clipping in training.')
     parser.set_defaults(gradient_clipping=False)
 
-    parser.add_argument('--clipping-threshold', default=1, type=float,
+    parser.add_argument('--clipping_threshold', default=1, type=float,
                         help='The threshold value for gradient clipping.')
 
     # learning rate
-    parser.add_argument('--learning-rate', default=1e-3, type=float,
+    parser.add_argument('--learning_rate', default=1e-3, type=float,
                         help='Initial learning rate of the Adam optimizer.')
-    parser.add_argument('--lr-decay-start', default=20, type=int,
+    parser.add_argument('--lr_decay_start', default=1, type=int,
                         help='The minimum epoch (after scheduled sampling) to start learning rate decay.')
-    parser.add_argument('--lr-decay-epoch', default=5, type=int,
+    parser.add_argument('--lr_decay_epoch', default=2, type=int,
                         help='The learning rate is decayed every decay_epoch.')
-    parser.add_argument('--lr-decay-rate', default=0.98, type=float,
+    parser.add_argument('--lr_decay_rate', default=0.98, type=float,
                         help='The learning rate by decayed by decay_rate every epoch.')
 
     # scheduled sampling ratio
-    parser.add_argument('--ssr-decay-start', default=20, type=int,
+    parser.add_argument('--ssr_decay_start', default=1, type=int,
                         help='The minimum epoch to start scheduled sampling.')
-    parser.add_argument('--ssr-decay-epoch', default=1, type=int,
+    parser.add_argument('--ssr_decay_epoch', default=1, type=int,
                         help='Decay the scheduled sampling every ssr_decay_epoch.')
-    parser.add_argument('--ssr-decay-ratio', default=2e-3, type=float,
+    parser.add_argument('--ssr_decay_ratio', default=4e-2, type=float,
                         help='Decay the scheduled sampling by ssr_decay_ratio every time.')
 
     main(parser.parse_args())
