@@ -166,7 +166,6 @@ def main(args):
                             use_unlabeled=args.use_unlabeled,  # Unlabeled for train set
                             predict_final=args.predict_final,
                             predict_alternate=args.predict_alternate)
-    print(f"Length of train dataset - {len(train_dataset)}")
 
     # train_sampler = torch.utils.data.distributed.DistributedSampler(
     #     train_dataset, num_replicas=world_size, rank=args.local_rank, shuffle=True)
@@ -177,6 +176,8 @@ def main(args):
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, drop_last=True,
         num_workers=num_devices * 4, pin_memory=True, sampler=train_sampler)
+
+    print(f"Length of train dataset - {len(train_loader)}")
 
     train_samples = len(train_loader) * total_batch_size
 
@@ -189,13 +190,14 @@ def main(args):
                             use_unlabeled=False,  # Don't use unlabeled in eval
                             predict_final=args.predict_final,
                             predict_alternate=args.predict_alternate)
-    print(f"Length of val dataset - {len(valid_dataset)}")
 
     valid_sampler = torch.utils.data.distributed.DistributedSampler(
         valid_dataset, num_replicas=world_size, rank=args.local_rank, shuffle=False)
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=batch_size, drop_last=True,
         num_workers=num_devices * 4, pin_memory=True, sampler=valid_sampler)
+
+    print(f"Length of val dataset - {len(valid_loader)}")
 
     valid_samples = len(valid_loader) * total_batch_size
 
@@ -352,7 +354,7 @@ def main(args):
         model.eval()
         with torch.no_grad():
             samples, LOSS = 0., 0.
-            for it, frames in enumerate(valid_loader):
+            for it, (frames, video_names) in enumerate(valid_loader):
                 samples += total_batch_size
                 viz_batch = 0
                 frames = frames.permute(0, 1, 4, 2, 3).cuda()
