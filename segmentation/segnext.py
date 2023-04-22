@@ -55,7 +55,6 @@ class SEResNeXtBottleneck(nn.Module):
         out = self.se_layer(out)
         out += self.shortcut(residual)
         out = self.relu(out)
-        print(out.shape)
         return out
 
 
@@ -113,7 +112,6 @@ class SegNeXT(nn.Module):
 
     def forward(self, x):
         x = self.encoder(x)
-        print(x.shape)
         x = self.decoder(x)
         x = x[:, :, :, :240]
         return x
