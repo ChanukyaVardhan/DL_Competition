@@ -182,6 +182,7 @@ def main(args):
             entity="dl_competition",
             config=args,
         )
+        print("Wandb initialized")
 
     # Main script for training and validation
 
@@ -369,7 +370,7 @@ def main(args):
                     #                     plot_reconstructed_image(viz_pred, "Val Pred")
                     plot_reconstructed_image(
                         viz_gt, viz_pred, "Val", video_names[viz_batch])
-                wandb.log({"Eval Loss": LOSS})
+                    wandb.log({"Eval Loss": LOSS})
 
             LOSS /= valid_samples
 
