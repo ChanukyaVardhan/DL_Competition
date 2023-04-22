@@ -4,6 +4,44 @@ from dataloader import CLEVRERSegDataset
 from segmentation import SegNeXT
 from torchvision import transforms
 from torch.utils.data import DataLoader
+import torchmetrics
+
+
+def get_batch_entries(batch, device):
+    input_images = batch[0].to(device)
+    gt_mask = batch[1].to(device)
+
+    return input_images, gt_mask
+
+
+def eval_epoch(model, criterion, eval_loader, device, params):
+    model.eval()
+    eval_loss = 0.0
+    num_batches = len(eval_loader)
+
+    stacked_pred = None
+    stacked_gt = None
+    with torch.no_grad():
+        for i, batch in enumerate(eval_loader):
+            input_images, gt_mask = get_batch_entries(batch, device)
+            batch_size = input_images.shape[0]
+
+            output_mask = model(input_images)
+            loss = criterion(output_mask, gt_mask)
+
+            eval_loss += loss.item()
+            pred_mask = torch.argmax(output_mask, dim=1)
+            if stacked_pred is None:
+                stacked_pred = pred_mask
+                stacked_gt = gt_mask
+            else:
+                stacked_pred = torch.cat([stacked_pred, pred_mask], dim=0)
+                stacked_gt = torch.cat([stacked_gt, gt_mask], dim=0)
+
+    eval_loss /= num_batches
+
+    return eval_loss, stacked_pred, stacked_gt
+
 
 if __name__ == "__main__":
     params = get_parameters()
@@ -45,7 +83,11 @@ if __name__ == "__main__":
     model = SegNeXT(params["num_classes"], weights=None)
     model = model.to(device)
 
-    eval_loss, mIoU = eval_epoch(
+    eval_loss, stacked_pred, stacked_gt = eval_epoch(
         model, criterion, eval_loader, device, params)
 
-    print(eval_loss, mIoU)
+    jaccard = torchmetrics.JaccardIndex(
+        task="multiclass", num_classes=49).to(device)
+
+    jaccard_val = jaccard(stacked_pred, stacked_gt)
+    print("Jaccard: ", jaccard_val)
