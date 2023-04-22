@@ -15,6 +15,7 @@ import time
 import torchvision
 import skimage.metrics
 import cv2
+from PIL import Image
 
 # math/probability modules
 import random
@@ -53,6 +54,27 @@ def unnormalize(img):
     pil_images = [to_pil(img) for img in unnormalized_image]
 
     return pil_images
+
+
+def create_collage(images, width, height):
+    collage = Image.new("RGB", (width, height))
+    x_offset = 0
+    for img in images:
+        img = img.resize((width // len(images), height))
+        collage.paste(img, (x_offset, 0))
+        x_offset += img.width
+    return collage
+
+
+def plot_reconstructed_image(gt_images, pred_images, prefix, ID):
+    # Plot the two images side by side
+    table = wandb.Table(columns=["Video", "Ground Truth", "Reconstructed"])
+    num_images = len(gt_images)
+    gt_collage = create_collage(gt_images, 160*num_images/2, 240)
+    pred_collage = create_collage(pred_images, 256, 256)
+    table.add_data(ID, wandb.Image(gt_collage), wandb.Image(pred_collage))
+
+    wandb.log({f"{prefix} Reconstructed Images": table})
 
 
 def main(args):
@@ -239,14 +261,6 @@ def main(args):
 
 #         wandb.log({prefix + " Images": wandb.Image(image)})
 
-    def plot_reconstructed_image(gt_images, pred_images, prefix, ID):
-        # Plot the two images side by side
-        table = wandb.Table(columns=["Video", "Ground Truth", "Reconstructed"])
-        table.add_data(ID, [wandb.Image(image)
-                       for image in gt_images], [wandb.Image(image) for image in pred_images])
-
-        wandb.log({f"{prefix} Reconstructed Images": table})
-
     for epoch in range(1, args.num_epochs + 1):
         print(f"Training Epoch - {epoch}")
         train_sampler.set_epoch(epoch)
@@ -259,7 +273,7 @@ def main(args):
             samples += total_batch_size
             viz_batch = 0
             frames = frames.permute(0, 1, 4, 2, 3).cuda()
-            viz_gt = unnormalize(frames[viz_batch])
+            viz_gt = unnormalize(frames[viz_batch][-args.output_frames:])
 
             inputs = frames[:, :-1]
             origin = frames[:, -args.output_frames:]
@@ -342,7 +356,7 @@ def main(args):
                 samples += total_batch_size
                 viz_batch = 0
                 frames = frames.permute(0, 1, 4, 2, 3).cuda()
-                viz_gt = unnormalize(frames[viz_batch])
+                viz_gt = unnormalize(frames[viz_batch][-args.output_frames:])
 
                 inputs = frames[:, :args.input_frames]
                 origin = frames[:, -args.output_frames:]
