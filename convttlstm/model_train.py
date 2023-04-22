@@ -226,10 +226,11 @@ def main(args):
 
 #         wandb.log({prefix + " Images": wandb.Image(image)})
 
-    def plot_reconstructed_image(gt_image, pred_image, prefix, ID):
+    def plot_reconstructed_image(gt_images, pred_images, prefix, ID):
         # Plot the two images side by side
         table = wandb.Table(columns=["Video", "Ground Truth", "Reconstructed"])
-        table.add_data(ID, wandb.Image(gt_image), wandb.Image(pred_image))
+        table.add_data(ID, [wandb.Image(image)
+                       for image in gt_images], [wandb.Image(image) for image in pred_images])
 
         wandb.log({f"{prefix} Reconstructed Images": table})
 
@@ -327,7 +328,7 @@ def main(args):
                 samples += total_batch_size
                 viz_batch = 0
                 frames = frames.permute(0, 1, 4, 2, 3).cuda()
-                viz_gt = unnormalize(frames[viz_batch][-1])
+                viz_gt = unnormalize(frames[viz_batch])
 
                 inputs = frames[:, :args.input_frames]
                 origin = frames[:, -args.output_frames:]
@@ -339,7 +340,7 @@ def main(args):
                              teacher_forcing=False,
                              checkpointing=False)
 
-                viz_pred = unnormalize(pred[viz_batch][-1].detach())
+                viz_pred = unnormalize(pred[viz_batch].detach())
 
                 loss = loss_func(pred, origin)
 
