@@ -14,6 +14,7 @@ import time
 import argparse
 import torchmetrics
 
+
 def plot_masks(pred_mask, gt_mask, image, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
     image = image.astype(np.uint8).transpose(1, 2, 0)
@@ -22,6 +23,7 @@ def plot_masks(pred_mask, gt_mask, image, idx):
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
         "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
     })
+
 
 def get_parameters():
     parser = argparse.ArgumentParser()
@@ -66,6 +68,7 @@ def get_parameters():
 def train_model(model, train_loader, optimizer, device, epoch):
     total_loss = 0.0
     total_batches = 0
+    model.train()
     for i, batch in enumerate(train_loader):
         # print(batch)
         images, targets = batch
@@ -79,6 +82,45 @@ def train_model(model, train_loader, optimizer, device, epoch):
         total_loss += loss.sum().item() / images.size(0)
         total_batches += 1
 
+        # if (i == 0):
+        #     # pred_mask = np.zeros_like(images[0].detach().cpu().numpy(), dtype=np.uint8)
+        #     print(outputs)
+        #     print(type(outputs['masks']))
+        #     pred_mask = np.zeros((49, 160, 240), dtype=np.uint8)
+        #     for ob in range(outputs[0]['masks'].shape[0]):
+        #         ma = outputs[0]['masks'][ob].detach().cpu().numpy()
+        #         idxx = outputs[0]['labels'][ob].detach().cpu().item()
+        #         pred_mask[idxx] = np.logical_or(pred_mask[idxx], ma)
+
+        #     gt_mask = np.zeros((49, 160, 240), dtype=np.uint8)
+        #     for ob in range(targets[0]['masks'].shape[0]):
+        #         ma = targets[0]['masks'][ob].detach().cpu().numpy()
+        #         idxx = targets[0]['labels'][ob].detach().cpu().item()
+        #         gt_mask[idxx] = np.logical_or(pred_mask[idxx], ma)
+
+        #     mask = plot_masks(pred_mask, gt_mask, images[0].cpu().numpy(), i)
+        #     wandb.log({"train_predictions": mask})
+        #     jaccard = torchmetrics.JaccardIndex(
+        #         task="multiclass", num_classes=49)
+        #     wandb.log({"Train mIoU": jaccard(pred_mask, gt_mask)})
+
+    print("Epoch: ", epoch, "Train Loss: ", total_loss / total_batches)
+
+    return total_loss / total_batches
+
+
+def eval_model(model, eval_loader, device, epoch):
+    total_loss = 0.0
+    total_batches = 0
+    model.eval()
+    for i, batch in enumerate(eval_loader):
+        images, targets = batch
+        images = images.to(device)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        outputs = model(images, targets)
+        loss = sum(dct['loss'] for dct in outputs)
+        total_loss += loss.sum().item() / images.size(0)
+        total_batches += 1
         if (i == 0):
             # pred_mask = np.zeros_like(images[0].detach().cpu().numpy(), dtype=np.uint8)
             print(outputs)
@@ -100,23 +142,6 @@ def train_model(model, train_loader, optimizer, device, epoch):
             jaccard = torchmetrics.JaccardIndex(
                 task="multiclass", num_classes=49)
             wandb.log({"Train mIoU": jaccard(pred_mask, gt_mask)})
-
-    print("Epoch: ", epoch, "Train Loss: ", total_loss / total_batches)
-
-    return total_loss / total_batches
-
-
-def eval_model(model, eval_loader, device, epoch):
-    total_loss = 0.0
-    total_batches = 0
-    for i, batch in enumerate(eval_loader):
-        images, targets = batch
-        images = images.to(device)
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        outputs = model(images, targets)
-        loss = sum(loss for loss in outputs.values())
-        total_loss += loss.sum().item() / images.size(0)
-        total_batches += 1
 
     print("Epoch: ", epoch, "Eval Loss: ", total_loss / total_batches)
     return total_loss / total_batches
@@ -188,13 +213,14 @@ if __name__ == "__main__":
     minm_loss = 100000000.0
 
     for epoch in range(num_epochs):
-        start_time  = time.time()
+        start_time = time.time()
         train_loss = train_model(model, train_loader, optimizer, device, epoch)
         epoch_time = time.time() - start_time
         torch.cuda.empty_cache()
         loss = eval_model(model, eval_loader, device, epoch)
         torch.cuda.empty_cache()
-        wandb.log({"train_loss": train_loss, "eval_loss": loss, "epoch_time": epoch_time})
+        wandb.log({"train_loss": train_loss,
+                  "eval_loss": loss, "epoch_time": epoch_time})
         gc.collect()
         if loss < minm_loss:
             minm_loss = loss

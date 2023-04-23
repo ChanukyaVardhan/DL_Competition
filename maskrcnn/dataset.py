@@ -20,7 +20,7 @@ class MaskRCNNDataset(Dataset):
             self.path) if os.path.isdir(os.path.join(self.path, v))]
         self.video_paths.sort()
 
-        # self.video_paths = self.video_paths[0:1]  # Uncomment to test on a single video
+        self.video_paths = self.video_paths[14:15]  # Uncomment to test on a single video
 
         self.image_paths = [os.path.join(vpath, f"image_{i}.png") for i in range(
             22) for vpath in self.video_paths]
