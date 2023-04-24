@@ -32,3 +32,6 @@ _site
 wandb*
 *.ninja
 .ninja_*
+
+# openSTL
+our_openSTL/work_dirs
