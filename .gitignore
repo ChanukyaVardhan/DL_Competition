@@ -27,6 +27,8 @@ Dataset*
 _site
 .vscode
 *.Identifier
+*.json
+*.log
 
 # wandb
 wandb*
