@@ -40,7 +40,7 @@ class Clevrer(Dataset):
         self.video_paths.sort()
         print("Videos before : ", len(self.video_paths))
         print("***********TRAINING FOR A SINGLE VIDEO LOCALLY!**********")
-        self.video_paths = self.video_paths[0:30]
+        self.video_paths = self.video_paths[0:300]
         print("Videos after : ", len(self.video_paths))
 
     def __len__(self):
