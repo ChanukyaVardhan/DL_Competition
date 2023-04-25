@@ -148,8 +148,8 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                          0.0571, 0.0567, 0.0614])
 ])
-split = "val" # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
-num_samples = 100 # 0 MEANS USE THE WHOLE DATASET
+split = "test" # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
+num_samples = 0 # 0 MEANS USE THE WHOLE DATASET
 data_dir = "./data"
 video_predictor = "convttlstm"
 video_predictor_path = "./checkpoints/convttlstm_best.pt"
