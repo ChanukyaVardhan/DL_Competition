@@ -9,6 +9,7 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
 from convttlstm.utils.convlstmnet import ConvLSTMNet
+from our_OpenSTL.openstl.models import SimVP_Model
 from segmentation import SegNeXT
 import torchmetrics
 
@@ -108,12 +109,27 @@ class FINAL_Model(nn.Module):
             # self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cuda")["model"])
             self.m1.eval()
             print("Loaded convttlstm model!")
+        elif self.video_predictor == "simvp":
+            config = {
+                "in_shape": [11, 3, 160, 240],
+                "hid_S": 64,
+                "hid_T": 512,
+                "N_S": 4,
+                "N_T": 8,
+                "spatio_kernel_enc": 3,
+                "spatio_kernel_dec": 3
+            }
+            self.m1 = SimVP_Model(**config)
+            # self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cpu")["state_dict"])
+            self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cpu"))
+            self.m1.eval()
+            print("Loaded SimVP model!")
         else:
             raise Exception("FIX THIS!")
 
         if self.segmentation == "segnext":
             self.seg = SegNeXT(49, weights=None)
-            self.seg.load_state_dict(torch.load(self.segmentation_path)["model"])
+            self.seg.load_state_dict(torch.load(self.segmentation_path, map_location='cpu')["model"])
             self.seg.eval()
             print("Loaded segmentation model!")
         else:
@@ -124,6 +140,9 @@ class FINAL_Model(nn.Module):
         if self.video_predictor == "convttlstm":
             pred_images = self.m1(input_images,
                                   input_frames = 11, future_frames = 11, output_frames = 11, teacher_forcing = False)
+            pred_image = pred_images[:, -1]
+        elif self.video_predictor == "simvp":
+            pred_images = self.m1(input_images)
             pred_image = pred_images[:, -1]
         else:
             raise Exception("FIX THIS!")
@@ -148,11 +167,13 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                          0.0571, 0.0567, 0.0614])
 ])
-split = "test" # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
-num_samples = 0 # 0 MEANS USE THE WHOLE DATASET
+split = "val" # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
+num_samples = 20 # 0 MEANS USE THE WHOLE DATASET
 data_dir = "./data"
-video_predictor = "convttlstm"
-video_predictor_path = "./checkpoints/convttlstm_best.pt"
+# video_predictor = "convttlstm"
+# video_predictor_path = "./checkpoints/convttlstm_best.pt"
+video_predictor = "simvp"
+video_predictor_path = "./checkpoints/simvp_checkpoint.pth"
 segmentation = "segnext"
 segmentation_path = "./checkpoints/segmentation_default_pretrain_model.pt"
 
@@ -203,3 +224,5 @@ with torch.no_grad():
         print("Jaccard of predicted with gt: ", jaccard_val)
         jaccard_val = jaccard(stacked_target, stacked_gt)
         print("Jaccard of original with gt: ", jaccard_val)
+        jaccard_gt = jaccard(stacked_gt, stacked_gt)
+        print("Jaccard of gt with gt: ", jaccard_gt)
