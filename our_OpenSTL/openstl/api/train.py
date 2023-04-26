@@ -22,7 +22,7 @@ from openstl.utils import (set_seed, print_log, output_namespace, check_dir, col
 try:
     import nni
     has_nni = True
-except ImportError: 
+except ImportError:
     has_nni = False
 
 
@@ -63,7 +63,8 @@ class BaseExperiment(object):
             if self.args.dist:
                 device = f'cuda:{self._rank}'
                 torch.cuda.set_device(self._rank)
-                print(f'Use distributed mode with GPUs: local rank={self._rank}')
+                print(
+                    f'Use distributed mode with GPUs: local rank={self._rank}')
             else:
                 device = torch.device('cuda:0')
                 print('Use non-distributed mode with GPU:', device)
@@ -82,8 +83,8 @@ class BaseExperiment(object):
 
         # log and checkpoint
         base_dir = self.args.res_dir if self.args.res_dir is not None else 'work_dirs'
-        self.path = osp.join(base_dir, self.args.ex_name if not self.args.ex_name.startswith(self.args.res_dir) \
-            else self.args.ex_name.split(self.args.res_dir+'/')[-1])
+        self.path = osp.join(base_dir, self.args.ex_name if not self.args.ex_name.startswith(self.args.res_dir)
+                             else self.args.ex_name.split(self.args.res_dir+'/')[-1])
         check_dir(self.path)
 
         self.checkpoints_path = osp.join(self.path, 'checkpoints')
@@ -98,7 +99,8 @@ class BaseExperiment(object):
         timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
         prefix = 'train' if not self.args.test else 'test'
         logging.basicConfig(level=logging.INFO,
-                            filename=osp.join(self.path, '{}_{}.log'.format(prefix, timestamp)),
+                            filename=osp.join(
+                                self.path, '{}_{}.log'.format(prefix, timestamp)),
                             filemode='a', format='%(asctime)s - %(message)s')
 
         # init distributed env first, since logger depends on the dist info.
@@ -120,7 +122,8 @@ class BaseExperiment(object):
         env_info = '\n'.join([(f'{k}: {v}') for k, v in env_info_dict.items()])
         dash_line = '-' * 60 + '\n'
         if self._rank == 0:
-            print_log('Environment info:\n' + dash_line + env_info + '\n' + dash_line)
+            print_log('Environment info:\n' + dash_line +
+                      env_info + '\n' + dash_line)
 
         # set random seeds
         if self._dist:
@@ -138,7 +141,8 @@ class BaseExperiment(object):
         self._build_hook()
         # resume traing
         if self.args.auto_resume:
-            self.args.resume_from = osp.join(self.checkpoints_path, 'latest.pth')
+            self.args.resume_from = osp.join(
+                self.checkpoints_path, 'latest.pth')
         if self.args.resume_from is not None:
             self._load(name=self.args.resume_from)
         self.call_hook('before_run')
@@ -147,7 +151,8 @@ class BaseExperiment(object):
         self.steps_per_epoch = len(self.train_loader)
         print("STEPS PER EPOCH : >>>>>> ", self.steps_per_epoch)
         print(self.train_loader)
-        self.method = method_maps[self.args.method](self.args, self.device, self.steps_per_epoch)
+        self.method = method_maps[self.args.method](
+            self.args, self.device, self.steps_per_epoch)
         self.method.model.eval()
         # setup ddp training
         if self._dist:
@@ -163,7 +168,8 @@ class BaseExperiment(object):
                 priority = get_priority(hook_cfg.pop('priority', 'NORMAL'))
                 hook = hook_maps[k.lower()](**hook_cfg)
                 if hasattr(hook, 'priority'):
-                    raise ValueError('"priority" is a reserved attribute for hooks')
+                    raise ValueError(
+                        '"priority" is a reserved attribute for hooks')
                 hook.priority = priority  # type: ignore
                 # insert the hook to a sorted list
                 inserted = False
@@ -209,7 +215,8 @@ class BaseExperiment(object):
         # FIX : This is generally not a good idea
         if self.test_loader is None:
             if (self.vali_loader is None):
-                raise ValueError("No Validation loader found for CLEVRER dataset.")
+                raise ValueError(
+                    "No Validation loader found for CLEVRER dataset.")
             self.test_loader = self.vali_loader
         self._max_iters = self._max_epochs * len(self.train_loader)
 
@@ -224,14 +231,16 @@ class BaseExperiment(object):
 
     def _load(self, name=''):
         """Loading models from the checkpoint"""
-        filename = name if osp.isfile(name) else osp.join(self.checkpoints_path, name + '.pth')
+        filename = name if osp.isfile(name) else osp.join(
+            self.checkpoints_path, name + '.pth')
         try:
             checkpoint = torch.load(filename)
         except:
             return
         # OrderedDict is a subclass of dict
         if not isinstance(checkpoint, dict):
-            raise RuntimeError(f'No state_dict found in checkpoint file {filename}')
+            raise RuntimeError(
+                f'No state_dict found in checkpoint file {filename}')
         if self._dist:
             self.method.model.module.load_state_dict(checkpoint['state_dict'])
         else:
@@ -245,26 +254,34 @@ class BaseExperiment(object):
         """Plot the basic infomation of supported methods"""
         T, C, H, W = self.args.in_shape
         if self.args.method == 'simvp':
-            input_dummy = torch.ones(1, self.args.pre_seq_length, C, H, W).to(self.device)
+            input_dummy = torch.ones(
+                1, self.args.pre_seq_length, C, H, W).to(self.device)
         elif self.args.method == 'crevnet':
             # crevnet must use the batchsize rather than 1
-            input_dummy = torch.ones(self.args.batch_size, 20, C, H, W).to(self.device)
+            input_dummy = torch.ones(
+                self.args.batch_size, 20, C, H, W).to(self.device)
         elif self.args.method == 'phydnet':
-            _tmp_input1 = torch.ones(1, self.args.pre_seq_length, C, H, W).to(self.device)
-            _tmp_input2 = torch.ones(1, self.args.aft_seq_length, C, H, W).to(self.device)
+            _tmp_input1 = torch.ones(
+                1, self.args.pre_seq_length, C, H, W).to(self.device)
+            _tmp_input2 = torch.ones(
+                1, self.args.aft_seq_length, C, H, W).to(self.device)
             _tmp_constraints = torch.zeros((49, 7, 7)).to(self.device)
             input_dummy = (_tmp_input1, _tmp_input2, _tmp_constraints)
         elif self.args.method in ['convlstm', 'predrnnpp', 'predrnn', 'mim', 'e3dlstm', 'mau']:
             Hp, Wp = H // self.args.patch_size, W // self.args.patch_size
             Cp = self.args.patch_size ** 2 * C
-            _tmp_input = torch.ones(1, self.args.total_length, Hp, Wp, Cp).to(self.device)
-            _tmp_flag = torch.ones(1, self.args.aft_seq_length - 1, Hp, Wp, Cp).to(self.device)
+            _tmp_input = torch.ones(
+                1, self.args.total_length, Hp, Wp, Cp).to(self.device)
+            _tmp_flag = torch.ones(
+                1, self.args.aft_seq_length - 1, Hp, Wp, Cp).to(self.device)
             input_dummy = (_tmp_input, _tmp_flag)
         elif self.args.method == 'predrnnv2':
             Hp, Wp = H // self.args.patch_size, W // self.args.patch_size
             Cp = self.args.patch_size ** 2 * C
-            _tmp_input = torch.ones(1, self.args.total_length, Hp, Wp, Cp).to(self.device)
-            _tmp_flag = torch.ones(1, self.args.total_length - 2, Hp, Wp, Cp).to(self.device)
+            _tmp_input = torch.ones(
+                1, self.args.total_length, Hp, Wp, Cp).to(self.device)
+            _tmp_flag = torch.ones(
+                1, self.args.total_length - 2, Hp, Wp, Cp).to(self.device)
             input_dummy = (_tmp_input, _tmp_flag)
         else:
             raise ValueError(f'Invalid method name {self.args.method}')
@@ -302,7 +319,8 @@ class BaseExperiment(object):
                 if self._rank == 0:
                     print_log('Epoch: {0}, Steps: {1} | Lr: {2:.7f} | Train Loss: {3:.7f} | Vali Loss: {4:.7f}\n'.format(
                         epoch + 1, len(self.train_loader), cur_lr, loss_mean.avg, vali_loss))
-                    wandb.log({'train_loss': loss_mean.avg, 'vali_loss': vali_loss, 'epoch_time': epoch_time})
+                    wandb.log({'train_loss': loss_mean.avg,
+                              'vali_loss': vali_loss, 'epoch_time': epoch_time})
                     recorder(vali_loss, self.method.model, self.path)
                     self._save(name='latest')
             if self._use_gpu and self.args.empty_cache:
@@ -312,7 +330,8 @@ class BaseExperiment(object):
             assert False and "Exit training because work_dir is removed"
         best_model_path = osp.join(self.path, 'checkpoint.pth')
         if self._dist:
-            self.method.model.module.load_state_dict(torch.load(best_model_path))
+            self.method.model.module.load_state_dict(
+                torch.load(best_model_path))
         else:
             self.method.model.load_state_dict(torch.load(best_model_path))
         time.sleep(1)  # wait for some hooks like loggers to finish
@@ -331,11 +350,11 @@ class BaseExperiment(object):
 
         wandb.log(img_dict)
 
-
     def vali(self, vali_loader):
         """A validation loop during training"""
         self.call_hook('before_val_epoch')
-        preds, trues, val_loss = self.method.vali_one_epoch(self, self.vali_loader)
+        preds, trues, val_loss = self.method.vali_one_epoch(
+            self, self.vali_loader)
         self.call_hook('after_val_epoch')
 
         # print("Prediction shapes >>>||||>>>>> ",preds.shape, trues.shape)
@@ -355,17 +374,25 @@ class BaseExperiment(object):
 
         return val_loss
 
+    def test_hidden(self):
+        inputs, trues, preds = self.method.test_one_epoch(
+            self, self.test_loader)
+
+        return inputs, trues, preds
+
     def test(self):
         """A testing loop of STL methods"""
         if self.args.test:
             best_model_path = osp.join(self.path, 'checkpoint.pth')
             if self._dist:
-                self.method.model.module.load_state_dict(torch.load(best_model_path))
+                self.method.model.module.load_state_dict(
+                    torch.load(best_model_path))
             else:
                 self.method.model.load_state_dict(torch.load(best_model_path))
 
         self.call_hook('before_val_epoch')
-        inputs, trues, preds = self.method.test_one_epoch(self, self.test_loader)
+        inputs, trues, preds = self.method.test_one_epoch(
+            self, self.test_loader)
         self.call_hook('after_val_epoch')
 
         # FIX: Possible need better metrics for clever.
@@ -385,6 +412,7 @@ class BaseExperiment(object):
             check_dir(folder_path)
 
             for np_data in ['metrics', 'inputs', 'trues', 'preds']:
-                np.save(osp.join(folder_path, np_data + '.npy'), vars()[np_data])
+                np.save(osp.join(folder_path, np_data + '.npy'),
+                        vars()[np_data])
 
         return eval_res['mse']
