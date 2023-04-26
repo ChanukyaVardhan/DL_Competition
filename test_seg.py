@@ -36,9 +36,9 @@ def eval_epoch(model, criterion, eval_loader, device, params):
             stacked_gt.append(gt_mask.cpu())
 
     eval_loss /= num_batches
-    stacked_pred = torch.cat(stacked_pred,0)
-    stacked_gt = torch.cat(stacked_gt,0)
-    
+    stacked_pred = torch.cat(stacked_pred, 0)
+    stacked_gt = torch.cat(stacked_gt, 0)
+
     return eval_loss, stacked_pred, stacked_gt
 
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     ])
     data_dir = params["data_dir"]
     val_dataset = CLEVRERSegDataset(
-        data_dir=data_dir, split='val', user_transforms=transform)
+        data_dir=data_dir, split='hidden', user_transforms=transform)
     eval_loader = DataLoader(
         val_dataset, batch_size=params["batch_size"]*3, shuffle=False, num_workers=params["num_workers"])
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     model = model.to(device)
     model_details = torch.load(params["test_checkpoint"])
     model.load_state_dict(model_details["model"])
-    
+
     eval_loss, stacked_pred, stacked_gt = eval_epoch(
         model, criterion, eval_loader, device, params)
 
@@ -90,5 +90,6 @@ if __name__ == "__main__":
         task="multiclass", num_classes=49)
 
     print(stacked_pred.shape, stacked_gt.shape)
+    torch.save(stacked_pred, "stacked_pred.pt")
     jaccard_val = jaccard(stacked_pred, stacked_gt)
     print("Jaccard: ", jaccard_val)

@@ -18,8 +18,8 @@ class CLEVRERSegDataset(Dataset):
             self.path) if os.path.isdir(os.path.join(self.path, v))]
         self.video_paths.sort()
 
-        self.image_paths = [os.path.join(vpath, f"image_{i}.png") for i in range(
-            22) for vpath in self.video_paths]
+        self.image_paths = [os.path.join(
+            vpath, f"image_{10}.png") for vpath in self.video_paths]
 
         if split == 'val' and num_samples is not None:
             self.image_paths = random.sample(self.image_paths, num_samples)
@@ -36,8 +36,11 @@ class CLEVRERSegDataset(Dataset):
         image_idx = int(image_name.split("_")[1].split(".")[0])
 
         image = Image.open(image_path)
-        mask = torch.FloatTensor(
-            np.load(os.path.join(video_path, "mask.npy"))[image_idx])
+        if self.split == "hidden":
+            mask = torch.zeros((480, 320))
+        else:
+            mask = torch.FloatTensor(
+                np.load(os.path.join(video_path, "mask.npy"))[image_idx])
 
         # Set 255 to all mask values greater than 49
         mask[mask > 49] = 255
