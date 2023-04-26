@@ -10,10 +10,22 @@ from torchvision import transforms
 import torchmetrics
 from dataloader import CLEVRERSegDataset
 import wandb
+import numpy as np
+from utils import class_labels
 
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def plot_masks(pred_mask, gt_mask, image, idx):
+    # Plot the predicted mask and the ground truth mask side by side with the IoU score
+    image = image.astype(np.uint8).transpose(1, 2, 0)
+
+    return wandb.Image(image, masks={
+        "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
+        "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
+    })
 
 
 def get_parameters():
@@ -56,9 +68,9 @@ wandb.init(
 # Set the appropriate arguments for your dataset class
 transform = transforms.Compose([
     transforms.ToTensor(),
-    #         transforms.RandomHorizontalFlip(),
-    #         transforms.RandomVerticalFlip(),
-    # transforms.RandomResizedCrop(size = 224, scale = (0.8, 1.0), ratio = (0.8, 1.2)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.RandomRotation(30),
     transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
         0.0571, 0.0567, 0.0614])
 ])
@@ -86,6 +98,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 num_epochs = 100
 for epoch in range(num_epochs):
     model.train()
+    train_loss = 0.0
     for images, masks in train_loader:
         images, masks = images.to(device), masks.to(device)
 
@@ -93,9 +106,13 @@ for epoch in range(num_epochs):
 
         outputs = model(images)['out']
         loss = criterion(outputs, masks)
+        train_loss += loss.item()
         loss.backward()
 
         optimizer.step()
+
+    train_loss /= len(train_loader)
+    wandb.log({"train_loss": train_loss})
 
     # Validation loop
     if epoch % 5 == 0:
@@ -106,7 +123,7 @@ for epoch in range(num_epochs):
         jaccard = torchmetrics.JaccardIndex(
             task="multiclass", num_classes=params["num_classes"])
         with torch.no_grad():
-            for images, masks in val_loader:
+            for i, (images, masks) in enumerate(val_loader):
                 images, gt_mask = images.to(device), masks.to(device)
 
                 outputs = model(images)['out']
@@ -117,6 +134,12 @@ for epoch in range(num_epochs):
                 pred_mask = torch.argmax(outputs, dim=1)
                 stacked_pred.append(pred_mask.cpu())
                 stacked_gt.append(gt_mask.cpu())
+
+                if i % 100 == 0:
+                    mask = plot_masks(pred_mask[0].cpu().numpy(
+                    ), gt_mask[0].cpu().numpy(), images[0].cpu.numpy(), i)
+                    wandb.log({"val_predictions": mask})
+
         stacked_pred = torch.cat(stacked_pred, 0)
         stacked_gt = torch.cat(stacked_gt, 0)
         jaccard_score = jaccard(stacked_pred, stacked_gt)
