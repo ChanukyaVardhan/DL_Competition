@@ -1,16 +1,16 @@
+from openstl.utils import (create_parser, get_dist_info, load_config,
+                           setup_multi_processes, update_config)
+from openstl.api import BaseExperiment
 import os.path as osp
 import warnings
 import wandb
 warnings.filterwarnings('ignore')
 
-from openstl.api import BaseExperiment
-from openstl.utils import (create_parser, get_dist_info, load_config,
-                           setup_multi_processes, update_config)
 
 try:
     import nni
     has_nni = True
-except ImportError: 
+except ImportError:
     has_nni = False
 
 
@@ -27,17 +27,18 @@ if __name__ == '__main__':
     print("Config path >>>>>>: ", cfg_path)
     config = update_config(config, load_config(cfg_path),
                            exclude_keys=['method', 'batch_size', 'val_batch_size', 'sched'])
-    
+
     print("Training for epochs : ", config['epoch'])
-    print("Batch sizes : ", config['batch_size'], "    ", config['val_batch_size'])
+    print("Batch sizes : ", config['batch_size'],
+          "    ", config['val_batch_size'])
 
     # set multi-process settings
     setup_multi_processes(config)
-    wandb.init(
-            entity="dl_competition",
-            config={"epochs": args.epoch,
-                    "batch_size": config['batch_size'], "learning_rate": args.lr},
-    )
+    # wandb.init(
+    #         entity="dl_competition",
+    #         config={"epochs": args.epoch,
+    #                 "batch_size": config['batch_size'], "learning_rate": args.lr},
+    # )
     print('>'*35 + ' training ' + '<'*35)
     exp = BaseExperiment(args)
     rank, _ = get_dist_info()

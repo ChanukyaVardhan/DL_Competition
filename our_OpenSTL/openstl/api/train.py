@@ -244,7 +244,7 @@ class BaseExperiment(object):
         if self._dist:
             self.method.model.module.load_state_dict(checkpoint['state_dict'])
         else:
-            self.method.model.load_state_dict(checkpoint['state_dict'])
+            self.method.model.load_state_dict(checkpoint)
         if checkpoint.get('epoch', None) is not None:
             self._epoch = checkpoint['epoch']
             self.method.model_optim.load_state_dict(checkpoint['optimizer'])

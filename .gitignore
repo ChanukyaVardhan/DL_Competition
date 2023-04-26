@@ -34,3 +34,6 @@ _site
 wandb*
 *.ninja
 .ninja_*
+
+# python setup files
+our_OpenSTL/OpenSTL.egg-info/

@@ -13,6 +13,10 @@ from segmentation import SegNeXT
 from openstl.methods import SimVP
 from openstl.api import BaseExperiment
 from openstl.utils import create_parser
+import os.path as osp
+
+from openstl.utils import (create_parser, get_dist_info, load_config,
+                           setup_multi_processes, update_config)
 import torchmetrics
 
 
@@ -119,12 +123,24 @@ class FINAL_Model(nn.Module):
             print("Loaded convttlstm model!")
         elif self.video_predictor == "simvp":
             args = create_parser().parse_args()
+            config = args.__dict__
+
             args.dataname = "clevrer"
             args.data_root = data_dir
             args.method = "SimVP"
             args.val_batch_size = 8
             args.use_gpu = True
             args.resume_from = video_predictor_path
+            args.exp_name = "14000cleanvids_simvp_batch"
+
+            cfg_path = osp.join('./configs', args.dataname,
+                                f'SimVP.py') if args.config_file is None else args.config_file
+            print("Config path >>>>>>: ", cfg_path)
+            config = update_config(config, load_config(cfg_path),
+                                   exclude_keys=['method', 'batch_size', 'val_batch_size', 'sched'])
+
+            config['test'] = True
+
             self.m1 = BaseExperiment(args)
         else:
             raise Exception("FIX THIS!")
@@ -180,6 +196,7 @@ video_predictor = "convttlstm"
 video_predictor = "simvp"
 
 video_predictor_path = "./checkpoints/convttlstm_best.pt"
+video_predictor_path = "./checkpoints/simvp_checkpoint.pth"
 segmentation = "segnext"
 segmentation_path = "./checkpoints/segmentation_default_pretrain_model.pt"
 

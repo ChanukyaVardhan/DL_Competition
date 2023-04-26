@@ -17,7 +17,7 @@ cd ./our_OpenSTL
 python tools/clevrer_train.py \
     --epoch 200 \
     --dataname "clevrer" \
-    --data_root "../../../Dataset_Student" \
+    --data_root "/mnt/c/Users/menon/Downloads/hidden_set_for_leaderboard_1" \
     --method "SimVP" \
     --ex_name "14000cleanvids_simvp_batch" \
     --auto_resume \

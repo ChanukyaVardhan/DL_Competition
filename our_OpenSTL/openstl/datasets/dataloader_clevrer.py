@@ -21,6 +21,7 @@ class Clevrer(Dataset):
         self.img_width = params.get('height', 240)
         self.img_channels = params.get('channels', 3)
         self.transform = transform
+        self.split = split
 
         # FIX : Possibly need to normalize the data.
         self.mean = 0
@@ -72,11 +73,14 @@ class Clevrer(Dataset):
         input_images = torch.stack(input_images, dim=0)
 
         output_images = []
-        for index in output_frames:
-            image = self._load_image(os.path.join(
-                video_path, f"image_{index}.png"))
-            output_images.append(image)
-        output_images = torch.stack(output_images, dim=0)
+        if self.split != 'hidden':
+            for index in output_frames:
+                image = self._load_image(os.path.join(
+                    video_path, f"image_{index}.png"))
+                output_images.append(image)
+            output_images = torch.stack(output_images, dim=0)
+        else:
+            output_images = input_images
 
         # order: num_frames(0) x img_channel(1) x img_height(2) x img_width(3) : 22 x 3 x 160 x 240
         return input_images, output_images

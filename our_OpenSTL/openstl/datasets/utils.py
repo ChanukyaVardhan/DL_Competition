@@ -37,7 +37,8 @@ def fast_collate(batch):
         inner_tuple_size = len(batch[0][0])
         flattened_batch_size = batch_size * inner_tuple_size
         targets = torch.zeros(flattened_batch_size, dtype=torch.int64)
-        tensor = torch.zeros((flattened_batch_size, *batch[0][0][0].shape), dtype=torch.uint8)
+        tensor = torch.zeros(
+            (flattened_batch_size, *batch[0][0][0].shape), dtype=torch.uint8)
         for i in range(batch_size):
             # all input tensor tuples must be same length
             assert len(batch[i][0]) == inner_tuple_size
@@ -48,14 +49,16 @@ def fast_collate(batch):
     elif isinstance(batch[0][0], np.ndarray):
         targets = torch.tensor([b[1] for b in batch], dtype=torch.int64)
         assert len(targets) == batch_size
-        tensor = torch.zeros((batch_size, *batch[0][0].shape), dtype=torch.uint8)
+        tensor = torch.zeros(
+            (batch_size, *batch[0][0].shape), dtype=torch.uint8)
         for i in range(batch_size):
             tensor[i] += torch.from_numpy(batch[i][0])
         return tensor, targets
     elif isinstance(batch[0][0], torch.Tensor):
         targets = torch.tensor([b[1] for b in batch], dtype=torch.int64)
         assert len(targets) == batch_size
-        tensor = torch.zeros((batch_size, *batch[0][0].shape), dtype=torch.uint8)
+        tensor = torch.zeros(
+            (batch_size, *batch[0][0].shape), dtype=torch.uint8)
         for i in range(batch_size):
             tensor[i].copy_(batch[i][0])
         return tensor, targets
@@ -87,8 +90,10 @@ class PrefetchLoader:
         normalization_shape = (1, channels, 1, 1)
 
         self.loader = loader
-        self.mean = torch.tensor([x * 255 for x in mean]).cuda().view(normalization_shape)
-        self.std = torch.tensor([x * 255 for x in std]).cuda().view(normalization_shape)
+        self.mean = torch.tensor(
+            [x * 255 for x in mean]).cuda().view(normalization_shape)
+        self.std = torch.tensor([x * 255 for x in std]
+                                ).cuda().view(normalization_shape)
         self.fp16 = fp16
         if fp16:
             self.mean = self.mean.half()
@@ -148,18 +153,22 @@ def create_loader(dataset,
                   persistent_workers=True,
                   worker_seeding='all'):
     sampler = None
+    if (len(dataset) == 0):
+        return None
     if distributed and not isinstance(dataset, torch.utils.data.IterableDataset):
         if is_training:
             if num_aug_repeats:
-                sampler = RepeatAugSampler(dataset, num_repeats=num_aug_repeats)
+                sampler = RepeatAugSampler(
+                    dataset, num_repeats=num_aug_repeats)
             else:
-                sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+                sampler = torch.utils.data.distributed.DistributedSampler(
+                    dataset)
         else:
             # This will add extra duplicate entries to result in equal num
             # of samples per-process, will slightly alter validation results
             sampler = OrderedDistributedSampler(dataset)
     else:
-        assert num_aug_repeats==0, "RepeatAugment is not supported in non-distributed or IterableDataset"
+        assert num_aug_repeats == 0, "RepeatAugment is not supported in non-distributed or IterableDataset"
 
     if collate_fn is None:
         collate_fn = fast_collate if use_prefetcher else torch.utils.data.dataloader.default_collate
@@ -167,7 +176,8 @@ def create_loader(dataset,
 
     loader_args = dict(
         batch_size=batch_size,
-        shuffle=shuffle and (not isinstance(dataset, torch.utils.data.IterableDataset)) and is_training,
+        shuffle=shuffle and (not isinstance(
+            dataset, torch.utils.data.IterableDataset)) and is_training,
         num_workers=num_workers,
         sampler=sampler,
         collate_fn=collate_fn,

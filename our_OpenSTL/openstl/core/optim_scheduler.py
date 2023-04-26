@@ -87,10 +87,12 @@ def get_optim_scheduler(args, epoch, model, steps_per_epoch):
     opt_lower = opt_split[-1]
     if opt_lower == 'sgd' or opt_lower == 'nesterov':
         opt_args.pop('eps', None)
-        optimizer = optim.SGD(parameters, momentum=args.momentum, nesterov=True, **opt_args)
+        optimizer = optim.SGD(
+            parameters, momentum=args.momentum, nesterov=True, **opt_args)
     elif opt_lower == 'momentum':
         opt_args.pop('eps', None)
-        optimizer = optim.SGD(parameters, momentum=args.momentum, nesterov=False, **opt_args)
+        optimizer = optim.SGD(
+            parameters, momentum=args.momentum, nesterov=False, **opt_args)
     elif opt_lower == 'adam':
         optimizer = optim.Adam(parameters, **opt_args)
     elif opt_lower == 'adamw':
@@ -102,7 +104,8 @@ def get_optim_scheduler(args, epoch, model, steps_per_epoch):
     elif opt_lower == 'adamp':
         optimizer = AdamP(parameters, wd_ratio=0.01, nesterov=True, **opt_args)
     elif opt_lower == 'sgdp':
-        optimizer = SGDP(parameters, momentum=args.momentum, nesterov=True, **opt_args)
+        optimizer = SGDP(parameters, momentum=args.momentum,
+                         nesterov=True, **opt_args)
     elif opt_lower == 'adadelta':
         optimizer = optim.Adadelta(parameters, **opt_args)
     elif opt_lower == 'adafactor':
@@ -112,9 +115,11 @@ def get_optim_scheduler(args, epoch, model, steps_per_epoch):
     elif opt_lower == 'adahessian':
         optimizer = Adahessian(parameters, **opt_args)
     elif opt_lower == 'rmsprop':
-        optimizer = optim.RMSprop(parameters, alpha=0.9, momentum=args.momentum, **opt_args)
+        optimizer = optim.RMSprop(
+            parameters, alpha=0.9, momentum=args.momentum, **opt_args)
     elif opt_lower == 'rmsproptf':
-        optimizer = RMSpropTF(parameters, alpha=0.9, momentum=args.momentum, **opt_args)
+        optimizer = RMSpropTF(parameters, alpha=0.9,
+                              momentum=args.momentum, **opt_args)
     elif opt_lower == 'nvnovograd':
         optimizer = NvNovoGrad(parameters, **opt_args)
     else:
@@ -126,6 +131,7 @@ def get_optim_scheduler(args, epoch, model, steps_per_epoch):
 
     sched_lower = args.sched.lower()
     total_steps = epoch * steps_per_epoch
+    total_steps = 1 if total_steps < 1 else total_steps
     by_epoch = True
     if sched_lower == 'onecycle':
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
