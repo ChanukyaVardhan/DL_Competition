@@ -80,6 +80,10 @@ class FINAL_Model(nn.Module):
         self.segmentation_path = segmentation_path
         self.split = split
 
+        # self.normalize = torch.nn.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+        self.normalize = transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+                         0.0571, 0.0567, 0.0614])
+
         if self.video_predictor == "convttlstm":
             self.m1 = ConvLSTMNet(
                 input_channels = 3, 
@@ -141,13 +145,16 @@ class FINAL_Model(nn.Module):
             pred_images = self.m1(input_images,
                                   input_frames = 11, future_frames = 11, output_frames = 11, teacher_forcing = False)
             pred_image = pred_images[:, -1]
+            target_image = target_images[:, -1]
         elif self.video_predictor == "simvp":
             pred_images = self.m1(input_images)
             pred_image = pred_images[:, -1]
+            target_image = target_images[:, -1]
+
+            pred_image = torch.stack([self.normalize(pred_image[i]) for i in range(pred_image.shape[0])])
+            target_image = torch.stack([self.normalize(target_image[i]) for i in range(target_image.shape[0])])
         else:
             raise Exception("FIX THIS!")
-
-        target_image = target_images[:, -1]
 
         if self.segmentation == "segnext":
             pred_mask = self.seg(pred_image)
@@ -162,13 +169,8 @@ class FINAL_Model(nn.Module):
 
         return pred_mask, target_mask
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
-                         0.0571, 0.0567, 0.0614])
-])
 split = "val" # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
-num_samples = 20 # 0 MEANS USE THE WHOLE DATASET
+num_samples = 0 # 0 MEANS USE THE WHOLE DATASET
 data_dir = "./data"
 # video_predictor = "convttlstm"
 # video_predictor_path = "./checkpoints/convttlstm_best.pt"
@@ -176,6 +178,20 @@ video_predictor = "simvp"
 video_predictor_path = "./checkpoints/simvp_checkpoint.pth"
 segmentation = "segnext"
 segmentation_path = "./checkpoints/segmentation_default_pretrain_model.pt"
+
+if video_predictor == "convttlstm":
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+                             0.0571, 0.0567, 0.0614])
+    ])
+elif video_predictor == "simvp":
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+else:
+    raise Exception("FIX THIS!")
+
 
 dataset = TEST_Dataset(data_dir = data_dir, num_samples = num_samples, transform = transform, split = split)
 
