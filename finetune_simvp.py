@@ -11,6 +11,7 @@ import torchvision.transforms as transforms
 from our_OpenSTL.openstl.models import SimVP_Model
 from our_OpenSTL.openstl.datasets import load_data
 from our_OpenSTL.openstl.modules import ConvSC
+# from our_OpenSTL.openstl.api import BaseExperiment
 import torchmetrics
 from train_seg import get_parameters, eval_epoch
 
@@ -22,8 +23,8 @@ def count_parameters(model):
 if __name__ == "__main__":
     params = get_parameters()
 
-    # train_loader, val_loader, test_loader = load_data(
-    #     "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"])
+    train_loader, val_loader, test_loader = load_data(
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -36,6 +37,8 @@ if __name__ == "__main__":
         "spatio_kernel_enc": 3,
         "spatio_kernel_dec": 3
     }
+    # exp = BaseExperiment(args)
+
     model = SimVP_Model(**config)
     sim_vp_model_path = params["model_path"]
     model.load_state_dict(torch.load(sim_vp_model_path))
