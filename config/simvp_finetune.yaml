@@ -25,3 +25,4 @@ model_path: ./checkpoints/simvp_checkpoint.pth
 num_classes: 49
 ft_lr: 1e-4
 ft_num_epochs: 50
+use_mask: true
