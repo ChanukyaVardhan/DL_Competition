@@ -42,6 +42,7 @@ if __name__ == '__main__':
     #                 "batch_size": config['batch_size'], "learning_rate": args.lr},
     # )
     print('>'*35 + ' training ' + '<'*35)
+    
     exp = BaseExperiment(args)
     rank, world_size = get_dist_info()
     print(f"{rank=}")

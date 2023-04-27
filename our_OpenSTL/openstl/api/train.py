@@ -33,6 +33,7 @@ class BaseExperiment(object):
         """Initialize experiments (non-dist as an example)"""
         self.args = args
         self.config = self.args.__dict__
+        self.config["distributed"] = self.args.dist
         self.device = self.args.device
         # FIX : Hardcoded to use CPU, locally.
         # The hardcoding can be changed from command line.
@@ -130,6 +131,18 @@ class BaseExperiment(object):
         else:
             seed = self.args.seed
         set_seed(seed)
+
+        total_batch_size = self.args.batch_size
+        assert total_batch_size % self._world_size == 0, \
+            'The batch_size is not divisible by self._world_size.'
+        self.args.batch_size = total_batch_size // self._world_size
+        self.config["batch_size"] = self.args.batch_size
+
+        total_batch_size = self.args.val_batch_size
+        assert total_batch_size % self._world_size == 0, \
+            'The batch_size is not divisible by self._world_size.'
+        self.args.val_batch_size = total_batch_size // self._world_size
+        self.config["val_batch_size"] = self.args.val_batch_size
 
         # prepare data
         self._get_data()
@@ -304,6 +317,9 @@ class BaseExperiment(object):
                     print_log('Epoch: {0}, Steps: {1} | Lr: {2:.7f} | Train Loss: {3:.7f} | Vali Loss: {4:.7f}\n'.format(
                         epoch + 1, len(self.train_loader), cur_lr, loss_mean.avg, vali_loss))
                     wandb.log({'train_loss': loss_mean.avg, 'vali_loss': vali_loss, 'epoch_time': epoch_time})
+
+                    # RECORDER IS NOT SAVING THE WEIGHTS TO CPU. IT IS SAVING WITH MODULE.KEYS
+
                     recorder(vali_loss, self.method.model, self.path)
                     self._save(name='latest')
             if self._use_gpu and self.args.empty_cache:

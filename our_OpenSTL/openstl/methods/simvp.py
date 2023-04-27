@@ -8,6 +8,8 @@ from openstl.models import SimVP_Model
 from openstl.utils import reduce_tensor
 from .base_method import Base_method
 
+import torchvision.transforms as transforms
+import numpy as np
 
 class SimVP(Base_method):
     r"""SimVP
@@ -52,6 +54,7 @@ class SimVP(Base_method):
 
     def train_one_epoch(self, runner, train_loader, epoch, num_updates, eta=None, **kwargs):
         """Train the model with train_loader."""
+        # print(f"Length of train_loader on device {self.rank} = {len(train_loader)}")
         data_time_m = AverageMeter()
         losses_m = AverageMeter()
         self.model.train()
@@ -60,7 +63,9 @@ class SimVP(Base_method):
         train_pbar = tqdm(train_loader) if self.rank == 0 else train_loader
 
         end = time.time()
-        for batch_x, batch_y in train_pbar:
+        for idx, (batch_x, batch_y) in enumerate(train_pbar):
+            print(f"Shape of x on device {self.device} = {batch_x.shape}")
+
             data_time_m.update(time.time() - end)
             self.model_optim.zero_grad()
 
@@ -105,6 +110,8 @@ class SimVP(Base_method):
 
             end = time.time()  # end for
 
+        print(f"Length of train_loader on device {self.rank} = {idx + 1}")
+
         if hasattr(self.model_optim, 'sync_lookahead'):
             self.model_optim.sync_lookahead()
 
@@ -112,7 +119,7 @@ class SimVP(Base_method):
 
     def vali_one_epoch(self, runner, vali_loader, **kwargs):
         """Evaluate the model with val_loader."""
-
+        # print(f"Length of vali_loader on device {self.rank} = {len(vali_loader)}")
         data_time_m = AverageMeter()
         losses_m = AverageMeter()
         self.model.eval()
@@ -159,15 +166,16 @@ class SimVP(Base_method):
                     log_buffer += ' | data time: {:.4f}'.format(data_time_m.avg)
                     val_pbar.set_description(log_buffer)
 
-                    if counter < 5: # Pick 5 images across the whole dataset
-                        results.append(dict(zip(['preds', 'trues'],
-                                                [unnormalize(pred_y[0, -1].detach()), unnormalize(batch_y[0, -1].detach())])))
-                        counter += 1;
+                if counter < 5: # Pick 5 images across the whole dataset
+                    results.append(dict(zip(['preds', 'trues'],
+                                            [unnormalize(pred_y[0, -1].detach()), unnormalize(batch_y[0, -1].detach())])))
+                    counter += 1;
 
                 end = time.time()  # end for
 
                 eval_loss += reduced_loss.item()
         eval_loss /= (idx + 1)
+        print(f"Length of vali_loader on device {self.rank} = {idx + 1}")
 
         results_all = {}
         for k in results[0].keys():

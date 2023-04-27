@@ -38,6 +38,9 @@ class Clevrer(Dataset):
         self.video_paths    = self.video_paths + [os.path.join(self.data_path, v) for v in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, v))]
 
         self.video_paths.sort()
+
+        # self.video_paths = self.video_paths[:24]
+
         print("Videos before : ", len(self.video_paths))
         # print("***********TRAINING FOR A SINGLE VIDEO LOCALLY!**********")
         # self.video_paths = self.video_paths[0:300]
@@ -92,7 +95,7 @@ def load_data(batch_size, val_batch_size,
     dataloader_vali = create_loader(val_set,
                                     batch_size=val_batch_size,
                                     shuffle=False, is_training=False,
-                                    pin_memory=True, drop_last=True,
+                                    pin_memory=True, drop_last=False,
                                     num_workers=num_workers, distributed=distributed)
     # dataloader_test = create_loader(test_set,
     #                                 batch_size=val_batch_size,
