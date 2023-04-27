@@ -1,0 +1,20 @@
+# model
+checkpoint_path:    "checkpoints"   # Model checkpoint path
+is_pretrain:        True            # Falg to decide pretraining
+test_checkpoint:    "./checkpoints/segmentation_deeplabv3.pt"
+
+
+# data
+data_dir:           "/vast/snm6477/DL_Finals/Dataset_Student"        # Data directory
+batch_size:         16               # Batch size
+num_workers:        4               # Number of workers for data loader
+num_classes:        49
+
+# training
+seed:               43              # Random Seed
+num_epochs:         100             # Number of epochs
+load_path:          ""              # Load saved model from this path
+optimizer:          "adam"          # Optimizer
+save_every:         10              # Save the model after every few epochs
+lr:                 1e-3           # Learning Rate
+weight_decay:       1e-5

@@ -78,8 +78,9 @@ def train_epoch(model, optimizer, criterion, train_loader, device, params):
                               gt_mask[0].cpu().numpy(), input_images[0].cpu.numpy(), i)
             wandb.log({"train_predictions": mask})
             jaccard = torchmetrics.JaccardIndex(
-                task="multiclass", num_classes=49).to(device)
-            wandb.log({"Train mIoU": jaccard(pred_mask[0], gt_mask[0])})
+                task="multiclass", num_classes=49)
+            wandb.log({"Train mIoU": jaccard(
+                pred_mask[0].cpu(), gt_mask[0].cpu())})
 
     train_loss /= num_batches
 
@@ -109,8 +110,9 @@ def eval_epoch(model, criterion, eval_loader, device, params):
                                   gt_mask[0].cpu().numpy(), input_images[0].cpu.numpy(), i)
                 wandb.log({"eval_predictions": mask})
                 jaccard = torchmetrics.JaccardIndex(
-                    task="multiclass", num_classes=49).to(device)
-                wandb.log({"val mIoU": jaccard(pred_mask[0], gt_mask[0])})
+                    task="multiclass", num_classes=49)
+                wandb.log({"val mIoU": jaccard(
+                    pred_mask[0].cpu(), gt_mask[0].cpu())})
 
     eval_loss /= num_batches
 

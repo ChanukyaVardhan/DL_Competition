@@ -43,6 +43,11 @@ class CLEVRERSegDataset(Dataset):
         mask[mask > 49] = 255
 
         if self.transforms is not None:
+            seed = torch.randint(0, 2**32, size=()).item()
+            # Ensure the same transform is applied to both image and mask
+            torch.manual_seed(seed)
             image = self.transforms(image)
+            torch.manual_seed(seed)
+            mask = self.transform(mask)
 
         return image, mask.long()
