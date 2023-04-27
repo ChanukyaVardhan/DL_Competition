@@ -1,0 +1,27 @@
+method: 'SimVP'
+
+# model
+spatio_kernel_enc: 3
+spatio_kernel_dec: 3
+# model_type = None  # define `model_type` in args
+hid_S: 64
+hid_T: 512
+N_T: 8
+N_S: 4
+
+# training
+lr: 1e-3
+batch_size: 4
+drop_path: 0
+sched: 'onecycle'
+batch_size: 4
+val_batch_size: 8
+num_workers: 4
+data_root: /mnt/c/Users/menon/Downloads/hidden_set_for_leaderboard_1
+distributed: false
+model_path: ./checkpoints/simvp_checkpoint.pth
+
+# Fine tuning
+num_classes: 49
+ft_lr: 1e-4
+ft_num_epochs: 50
