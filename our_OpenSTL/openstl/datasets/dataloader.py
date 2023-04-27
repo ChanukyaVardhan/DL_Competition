@@ -21,7 +21,12 @@ def load_data(dataname, batch_size, val_batch_size, num_workers, data_root, dist
         params = {}
         params['path'] = data_root
         params['num_frames'] = 22
-        transform = transforms.ToTensor()
+        # transform = transforms.ToTensor()
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+                                 0.0571, 0.0567, 0.0614])
+        ])
         return load_data(batch_size, val_batch_size, params, transform, data_root, num_workers,
                          pre_seq_length, aft_seq_length, distributed=distributed)  # FIX : Change the loader.
     elif dataname == 'taxibj':

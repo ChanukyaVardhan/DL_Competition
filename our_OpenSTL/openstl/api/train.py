@@ -113,6 +113,7 @@ class BaseExperiment(object):
             self._rank, self._world_size = get_dist_info()
             # re-set gpu_ids with distributed training mode
             self._gpu_ids = range(self._world_size)
+            print("GPU Ids -> ", self._gpu_ids)
         self.device = self._acquire_device()
 
         # log env info
@@ -321,11 +322,10 @@ class BaseExperiment(object):
     def wandb_log_images(self, preds, trues):
         if (self._rank != 0):
             return
-        num_vids_to_show = 5
         img_dict = {}
-        for i in range(num_vids_to_show):
-            img_true = wandb.Image(np.transpose(trues[i][10], (1, 2, 0)))
-            img_pred = wandb.Image(np.transpose(preds[i][10], (1, 2, 0)))
+        for i in range(len(preds)):
+            img_true = wandb.Image(trues[i])
+            img_pred = wandb.Image(preds[i])
             img_dict[f"True Image {i}"] = img_true
             img_dict[f"Pred Image {i}"] = img_pred
 
@@ -339,7 +339,8 @@ class BaseExperiment(object):
         self.call_hook('after_val_epoch')
 
         # print("Prediction shapes >>>||||>>>>> ",preds.shape, trues.shape)
-        self.wandb_log_images(preds, trues)
+        if self._rank == 0:
+            self.wandb_log_images(preds, trues)
 
         if self._rank == 0:
             if 'weather' in self.args.dataname:

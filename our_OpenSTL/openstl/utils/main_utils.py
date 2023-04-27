@@ -272,9 +272,12 @@ def init_random_seed(seed=None, device='cuda'):
 
 def _init_dist_pytorch(backend: str, **kwargs) -> None:
     # TODO: use local_rank instead of rank % num_gpus
+    # os.environ['RANK'] = '0'
     rank = int(os.environ['RANK'])
     num_gpus = torch.cuda.device_count()
     torch.cuda.set_device(rank % num_gpus)
+    print(f"WORLD SIZE IN ENV: {os.environ['WORLD_SIZE']}")
+    # os.environ['WORLD_SIZE'] = str(num_gpus)
     dist.init_process_group(backend=backend, **kwargs)
 
 

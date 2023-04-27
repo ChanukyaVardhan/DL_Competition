@@ -27,20 +27,31 @@ if __name__ == '__main__':
     print("Config path >>>>>>: ", cfg_path)
     config = update_config(config, load_config(cfg_path),
                            exclude_keys=['method', 'batch_size', 'val_batch_size', 'sched'])
+
+    # UPDATE IN ARGS AS WELL
+    args.batch_size = config['batch_size']
     
     print("Training for epochs : ", config['epoch'])
     print("Batch sizes : ", config['batch_size'], "    ", config['val_batch_size'])
 
     # set multi-process settings
     setup_multi_processes(config)
-    wandb.init(
-            entity="dl_competition",
-            config={"epochs": args.epoch,
-                    "batch_size": config['batch_size'], "learning_rate": args.lr},
-    )
+    # wandb.init(
+    #         entity="dl_competition",
+    #         config={"epochs": args.epoch,
+    #                 "batch_size": config['batch_size'], "learning_rate": args.lr},
+    # )
     print('>'*35 + ' training ' + '<'*35)
     exp = BaseExperiment(args)
-    rank, _ = get_dist_info()
+    rank, world_size = get_dist_info()
+    print(f"{rank=}")
+    print(f"{world_size=}")
+    if rank == 0:
+        wandb.init(
+                entity="dl_competition",
+                config={"epochs": args.epoch,
+                        "batch_size": args.batch_size, "learning_rate": args.lr},
+        )
     exp.train()
 
     if rank == 0:

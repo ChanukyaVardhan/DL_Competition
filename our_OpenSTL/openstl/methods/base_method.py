@@ -1,3 +1,4 @@
+from timm.utils import AverageMeter
 from typing import Dict, List, Union
 import numpy as np
 
@@ -9,6 +10,8 @@ from timm.utils.agc import adaptive_clip_grad
 
 from openstl.core.optim_scheduler import get_optim_scheduler
 from openstl.utils import gather_tensors_batch, get_dist_info, ProgressBar
+
+import torchvision.transforms as transforms
 
 has_native_amp = False
 try:
@@ -60,7 +63,8 @@ class Base_method(object):
         if self.args.fp16 and has_native_amp:
             self.amp_autocast = torch.cuda.amp.autocast
             self.loss_scaler = NativeScaler()
-            if self.args.rank == 0:
+            # if self.args.rank == 0:
+            if self.args.local_rank == 0:
                print('Using native PyTorch AMP. Training in mixed precision (fp16).')
         else:
             print('AMP not enabled. Training in float32.')
@@ -135,21 +139,54 @@ class Base_method(object):
         results = []
         prog_bar = ProgressBar(len(data_loader))
         length = len(data_loader.dataset) if length is None else length
+        counter = 0
+        eval_loss = 0.0
+        losses_m = AverageMeter()
+
+        def unnormalize(img):
+            mean = [0.5061, 0.5045, 0.5008]
+            std = [0.0571, 0.0567, 0.0614]
+            unnormalize_transform = transforms.Compose([
+                transforms.Normalize(
+                    mean=[-m/s for m, s in zip(mean, std)], std=[1/s for s in std]),
+            ])
+            to_pil = transforms.ToPILImage()
+
+            unnormalized_image = unnormalize_transform(img)
+            pil_images = to_pil(unnormalized_image)
+
+            return pil_images
+
         for i, (batch_x, batch_y) in enumerate(data_loader):
             with torch.no_grad():
                 batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
                 pred_y = self._predict(batch_x, batch_y)
-            results.append(dict(zip(['inputs', 'preds', 'trues'],
-                                    [batch_x.cpu().numpy(), pred_y.cpu().numpy(), batch_y.cpu().numpy()])))
+
+                loss = self.criterion(pred_y, batch_y)
+                losses_m.update(loss.item(), batch_x.size(0))
+                eval_loss += loss.item()
+
+                # print(batch_x.shape, batch_y.shape, pred_y.shape)
+            # results.append(dict(zip(['inputs', 'preds', 'trues'],
+            #                         [batch_x.cpu().numpy(), pred_y.cpu().numpy(), batch_y.cpu().numpy()])))
+            if counter < 5: # Pick 5 images across the whole dataset
+                results.append(dict(zip(['preds', 'trues'],
+                                        # [unnormalize(pred_y[0, -1].detach()).cpu().numpy(), unnormalize(batch_y[0, -1].detach()).cpu().numpy()])))
+                                        [unnormalize(pred_y[0, -1].detach()), unnormalize(batch_y[0, -1].detach())])))
+                counter += 1;
             prog_bar.update()
             if self.args.empty_cache:
                 torch.cuda.empty_cache()
 
+        eval_loss /= (i+1)
+
         results_all = {}
         for k in results[0].keys():
-            results_all[k] = np.concatenate(
+            # results_all[k] = np.concatenate(
+            print(len(results[0]))
+            results_all[k] = np.stack(
                 [batch[k] for batch in results], axis=0)
-        return results_all
+        return results_all, eval_loss
 
     def vali_one_epoch(self, runner, vali_loader, **kwargs):
         """Evaluate the model with val_loader.
@@ -165,11 +202,12 @@ class Base_method(object):
         if self.dist and self.world_size > 1:
             results = self._dist_forward_collect(vali_loader, len(vali_loader.dataset))
         else:
-            results = self._nondist_forward_collect(vali_loader, len(vali_loader.dataset))
+            # results = self._nondist_forward_collect(vali_loader, len(vali_loader.dataset))
+            results, losses_m = self._nondist_forward_collect(vali_loader, len(vali_loader.dataset))
 
-        preds = torch.tensor(results['preds'])
-        trues = torch.tensor(results['trues'])
-        losses_m = self.criterion(preds, trues).cpu().numpy()
+        # preds = torch.tensor(results['preds'])
+        # trues = torch.tensor(results['trues'])
+        # losses_m = self.criterion(preds, trues).cpu().numpy()
         return results['preds'], results['trues'], losses_m
 
     def test_one_epoch(self, runner, test_loader, **kwargs):
