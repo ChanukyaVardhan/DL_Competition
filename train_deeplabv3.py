@@ -31,7 +31,7 @@ def plot_masks(pred_mask, gt_mask, image, idx):
 def get_parameters():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path", default="config/segmentation_default.yml", help="Path to config file.")
+        "--config_path", default="config/segmentation_deeplabv3.yml", help="Path to config file.")
     parser.add_argument("--save_every",  default=False, action="store_true",
                         help="Flag to save every few epochs to True.")
     args = parser.parse_args()
@@ -80,22 +80,30 @@ train_dataset = CLEVRERSegDataset(
 val_dataset = CLEVRERSegDataset(
     data_dir=data_dir, split='val', user_transforms=transform)
 
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+train_loader = DataLoader(
+    train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
+val_loader = DataLoader(
+    val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
 
 # Create the model
 model = deeplabv3_resnet50(
     num_classes=params["num_classes"], weights_backbone=None)
+model = nn.DataParallel(model).to(device) if num_gpus > 1 else model.to(device)
+
 # Print number of parameters
 print(f"Number of parameters: {count_parameters(model)}")
 model.to(device)
 
 # Set up the loss function and optimizer
 criterion = nn.CrossEntropyLoss(ignore_index=255)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(
+    model.parameters(), lr=params['lr'], weight_decay=params['weight_decay'])
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, 'min', factor=0.5, verbose=True, min_lr=1e-6)
 
 # Training loop
-num_epochs = 100
+num_epochs = params["num_epochs"]
+min_val_loss = float('inf')
 for epoch in range(num_epochs):
     model.train()
     train_loss = 0.0
@@ -148,8 +156,17 @@ for epoch in range(num_epochs):
         eval_loss /= len(val_loader)
         wandb.log({"val_loss": eval_loss})
 
+        scheduler.step(eval_loss)
+
+        # Save the best evaluation loss model
+        if eval_loss < min_val_loss:
+            min_val_loss = eval_loss
+            torch.save(model.module.state_dict(),
+                       f'deeplab_v3_segmentation_model_{epoch}.pth')
+
 
 # Save the trained model
-torch.save(model.state_dict(), 'deeplab_v3_segmentation_model.pth')
+# Access the inner model for saving
+torch.save(model.module.state_dict(), 'deeplab_v3_segmentation_model.pth')
 
 wandb.finish()
