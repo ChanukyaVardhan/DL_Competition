@@ -34,3 +34,7 @@ _site
 wandb*
 *.ninja
 .ninja_*
+
+# Greened files
+*.out
+*.err
