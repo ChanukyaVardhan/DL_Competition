@@ -62,6 +62,11 @@ if __name__ == "__main__":
         params["batch_size"] *= num_gpus
         params["num_workers"] *= num_gpus
     
+    wandb.init(
+       entity="finetune_simvp",
+        config=params,
+    )
+
     config = {
         "in_shape": [11, 3, 160, 240],
         "hid_S": 64,
