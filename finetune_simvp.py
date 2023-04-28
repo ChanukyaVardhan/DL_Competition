@@ -36,6 +36,7 @@ def unnormalize(img):
 
     return pil_image
 
+
 def create_collage(images, width, height):
     collage = Image.new("RGB", (width, height))
     x_offset = 0
@@ -44,6 +45,7 @@ def create_collage(images, width, height):
         collage.paste(img, (x_offset, 0))
         x_offset += img.width
     return collage
+
 
 def plot_masks(pred_mask, gt_mask, image, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
@@ -63,7 +65,7 @@ if __name__ == "__main__":
     params = get_parameters()
 
     train_loader, val_loader, test_loader = load_data(
-        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"])
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"], use_mask=params["use_mask"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_gpus = torch.cuda.device_count()
@@ -111,7 +113,8 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     optimizer = torch.optim.Adam(model.parameters(), lr=params["ft_lr"])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 'min', verbose=True)
     scaler = GradScaler()
 
     # Training loop
@@ -162,13 +165,13 @@ if __name__ == "__main__":
                     outputs_pred = model(images)
                     output_pred_flat = outputs_pred.view(-1, num_classes)
                     mask_flat = gt_masks.view(-1)
-                
+
                     loss = criterion(output_pred_flat, mask_flat)
                     eval_loss += loss.item()
 
                     pred_mask = torch.argmax(outputs_pred, dim=1)
-                    stacked_pred.append(pred_mask[:,-1,:,:].cpu())
-                    stacked_gt.append(gt_masks[:,-1,:,:].cpu())
+                    stacked_pred.append(pred_mask[:, -1, :, :].cpu())
+                    stacked_gt.append(gt_masks[:, -1, :, :].cpu())
 
                     if i % 100 == 0:
                         mask = plot_masks(pred_mask[0][-1].cpu().numpy(
