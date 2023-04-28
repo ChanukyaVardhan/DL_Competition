@@ -18,7 +18,7 @@ from our_OpenSTL.openstl.modules import ConvSC
 # from our_OpenSTL.openstl.api import BaseExperiment
 import torchmetrics
 from train_seg import get_parameters, eval_epoch
-from utils import class_labels
+from utils import class_labels, shapes, materials, colors
 
 
 mean = [0.5061, 0.5045, 0.5008]
@@ -61,6 +61,59 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
+# Use simvp as the backbone and add new heads for multi-class segmentation
+class SimVPSegmentor(nn.Module):
+    def __init__(self, config, sim_vp_model_path) -> None:
+        super().__init__()
+
+        self.simvp = SimVP_Model(**config)
+        self.load_simvp_weights(sim_vp_model_path)
+        C_hid = self.simvp.dec.readout.in_channels
+        # unroll simvp and add new heads
+        self.simvp.dec.readout = nn.Conv2d(C_hid, C_hid, kernel_size=1)
+
+        self.shape_head = nn.Conv2d(C_hid, len(shapes), kernel_size=1)
+        self.material_head = nn.Conv2d(C_hid, len(materials), kernel_size=1)
+        self.color_head = nn.Conv2d(C_hid, len(colors), kernel_size=1)
+
+        self.simvp.dec.readout.apply(self._init_weights)
+        self.shape_head.apply(self._init_weights)
+        self.material_head.apply(self._init_weights)
+        self.color_head.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Conv2d):
+            nn.init.kaiming_normal_(
+                m.weight, mode="fan_out", nonlinearity="relu")
+
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        # x: [B, T, 3, H, W]
+        # simvp_out: [B, T, C, H, W]
+        simvp_out = self.simvp(x)
+        B, T, C, H, W = simvp_out.shape
+
+        simvp_out = simvp_out.view(B*T, C, H, W)
+
+        shape_out = self.shape_head(simvp_out)
+        material_out = self.material_head(simvp_out)
+        color_out = self.color_head(simvp_out)
+
+        shape_out = shape_out.view(B, T, -1, H, W)
+        material_out = material_out.view(B, T, -1, H, W)
+        color_out = color_out.view(B, T, -1, H, W)
+
+        return shape_out, material_out, color_out
+
+    def load_simvp_weights(self, simvp_model_path):
+        self.simvp.load_state_dict(torch.load(simvp_model_path))
+        print("SimVP model loaded from {}".format(simvp_model_path))
+        print("SimVP model architecture: ")
+        print("Number of parameters: {}".format(count_parameters(self.simvp)))
+
+
 if __name__ == "__main__":
     params = get_parameters()
 
@@ -89,24 +142,19 @@ if __name__ == "__main__":
         "num_classes": params["num_classes"],
     }
     # exp = BaseExperiment(args)
-
-    model = SimVP_Model(**config)
-
     sim_vp_model_path = params["model_path"]
-    model.load_state_dict(torch.load(sim_vp_model_path))
-    print("SimVP model loaded from {}".format(sim_vp_model_path))
-    print("SimVP model architecture: ")
-#     print(model)
-    print("Number of parameters: {}".format(count_parameters(model)))
-
     num_classes = params["num_classes"]
 
-    # Replace the final two layers of the model to output segmentation masks
-    C_hid = model.dec.readout.in_channels
-    model.dec.dec[3] = ConvSC(
-        C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
-    model.dec.readout = nn.Conv2d(C_hid, num_classes, 1)
+#     model = SimVP_Model(**config)
 
+#     model.load_state_dict(torch.load(sim_vp_model_path))
+#     print("SimVP model loaded from {}".format(sim_vp_model_path))
+#     print("SimVP model architecture: ")
+# #     print(model)
+#     print("Number of parameters: {}".format(count_parameters(model)))
+
+    # Replace the final two layers of the model to output segmentation masks
+    model = SimVPSegmentor(config, sim_vp_model_path)
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
@@ -164,10 +212,10 @@ if __name__ == "__main__":
                 for i, (images, output, gt_masks) in tqdm(enumerate(val_loader)):
                     images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
-                    
+
 #                     output_pred_flat = outputs_pred.view(-1, num_classes)
 #                     mask_flat = gt_masks.view(-1)
-                
+
 #                     loss = criterion(output_pred_flat, mask_flat)
 #                     eval_loss += loss.item()
 
@@ -192,13 +240,14 @@ if __name__ == "__main__":
 
                 if eval_loss < min_val_loss:
                     min_val_loss = eval_loss
-                    torch.save(model.state_dict(),
-                               f'simvp_segmentation_model_{epoch}.pth')
+                    torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
+                    ), f'simvp_segmentation_model_{epoch}.pth')
                     print(
                         f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
 
     # Save the trained model
     # Access the inner model for saving
-    torch.save(model.module.state_dict(), 'simvp_segmentation_model.pth')
+    torch.save(model.module.state_dict() if num_gpus >
+               1 else model.state_dict(), 'simvp_segmentation_model.pth')
 
     wandb.finish()
