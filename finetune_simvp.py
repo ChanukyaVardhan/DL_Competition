@@ -18,8 +18,34 @@ from our_OpenSTL.openstl.modules import ConvSC
 # from our_OpenSTL.openstl.api import BaseExperiment
 import torchmetrics
 from train_seg import get_parameters, eval_epoch
+from utils import class_labels
 
 
+
+mean = [0.5061, 0.5045, 0.5008]
+std = [0.0571, 0.0567, 0.0614]
+unnormalize_transform = transforms.Compose([
+    transforms.Normalize(
+        mean=[-m/s for m, s in zip(mean, std)], std=[1/s for s in std]),
+])
+to_pil = transforms.ToPILImage()
+
+def unnormalize(img):
+    unnormalized_image = unnormalize_transform(img)
+    pil_image = to_pil(unnormalized_image)
+
+    return pil_image
+
+
+def plot_masks(pred_mask, gt_mask, image, idx):
+    # Plot the predicted mask and the ground truth mask side by side with the IoU score
+    image = unnormalize(image)
+
+    return wandb.Image(image, masks={
+        "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
+        "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
+    })
+    
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -110,15 +136,20 @@ if __name__ == "__main__":
             stacked_gt = []
             jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=params["num_classes"])
             with torch.no_grad():
-                for i, (images, output, masks) in enumerate(val_loader):
-                    images, masks = images.to(device), masks.to(device)
+                for i, (images, output, gt_masks) in enumerate(val_loader):
+                    images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
-                    loss = criterion(outputs_pred, masks)
+                    loss = criterion(outputs_pred, gt_masks)
                     eval_loss += loss.item()
                     
                     pred_mask = torch.argmax(outputs_pred, dim=1)
                     stacked_pred.append(pred_mask.cpu())
-                    stacked_gt.append(masks.cpu())
+                    stacked_gt.append(gt_masks.cpu())
+                    
+                    if i % 100 == 0:
+                        mask = plot_masks(pred_mask[0].cpu().numpy(
+                        ), gt_masks[0].cpu().numpy(), images[0].cpu(), i)
+                        wandb.log({"val_predictions": mask})
                 
                 stacked_pred = torch.cat(stacked_pred, dim=0)
                 stacked_gt = torch.cat(stacked_gt, dim=0)
