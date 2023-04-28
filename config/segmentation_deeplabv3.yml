@@ -5,8 +5,8 @@ test_checkpoint:    "./checkpoints/segmentation_deeplabv3.pt"
 
 
 # data
-data_dir:           "/vast/snm6477/DL_Finals/Dataset_Student"        # Data directory
-batch_size:         16               # Batch size
+data_dir:           "/scratch/pj2251/DL/DL_Competition/data/Dataset_Student"        # Data directory
+batch_size:         64               # Batch size
 num_workers:        4               # Number of workers for data loader
 num_classes:        49
 
