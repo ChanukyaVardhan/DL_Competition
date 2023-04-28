@@ -92,6 +92,9 @@ if __name__ == "__main__":
 
     model = SimVP_Model(**config)
 
+    model_params_before = count_parameters(model)
+    print("Model parameters before fixing : ", model_params_before)
+
     sim_vp_model_path = params["model_path"]
     model.load_state_dict(torch.load(sim_vp_model_path))
     print("SimVP model loaded from {}".format(sim_vp_model_path))
@@ -106,6 +109,9 @@ if __name__ == "__main__":
     model.dec.dec[3] = ConvSC(
         C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
     model.dec.readout = nn.Conv2d(C_hid, num_classes, 1)
+
+    model_params_after = count_parameters(model)
+    print("Model parameters after fixing and adding 2 new layers: ", model_params_after)
 
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
