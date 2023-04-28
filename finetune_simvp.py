@@ -80,14 +80,12 @@ if __name__ == "__main__":
     # exp = BaseExperiment(args)
 
     model = SimVP_Model(**config)
-    model = nn.DataParallel(model).to(
-        device) if num_gpus > 1 else model.to(device)
-
+    
     sim_vp_model_path = params["model_path"]
     model.load_state_dict(torch.load(sim_vp_model_path))
     print("SimVP model loaded from {}".format(sim_vp_model_path))
     print("SimVP model architecture: ")
-    print(model)
+#     print(model)
     print("Number of parameters: {}".format(count_parameters(model)))
 
     num_classes = params["num_classes"]
@@ -97,6 +95,9 @@ if __name__ == "__main__":
     model.dec.dec[3] = ConvSC(
         C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
     model.dec.readout = nn.Conv2d(C_hid, num_classes, 1)
+
+    model = nn.DataParallel(model).to(
+        device) if num_gpus > 1 else model.to(device)
 
     criterion = nn.CrossEntropyLoss()  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
@@ -119,7 +120,7 @@ if __name__ == "__main__":
                 device), output_mask.to(device)
             optimizer.zero_grad()
 
-            with autocast():
+            with autocast(enabled=False):
                 outputs_pred = model(input_images)
                 loss = criterion(outputs_pred, output_mask)
 
