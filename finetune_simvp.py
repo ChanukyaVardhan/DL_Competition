@@ -75,12 +75,13 @@ if __name__ == "__main__":
         "N_S": 4,
         "N_T": 8,
         "spatio_kernel_enc": 3,
-        "spatio_kernel_dec": 3
+        "spatio_kernel_dec": 3,
+        "num_classes": params["num_classes"],
     }
     # exp = BaseExperiment(args)
 
     model = SimVP_Model(**config)
-    
+
     sim_vp_model_path = params["model_path"]
     model.load_state_dict(torch.load(sim_vp_model_path))
     print("SimVP model loaded from {}".format(sim_vp_model_path))
