@@ -118,7 +118,7 @@ if __name__ == "__main__":
     params = get_parameters()
 
     train_loader, val_loader, test_loader = load_data(
-        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"], use_mask=params["use_mask"])
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"], use_mask=params["use_mask"], split_mask=params["split_mask"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_gpus = torch.cuda.device_count()

@@ -25,3 +25,4 @@ num_classes: 49
 ft_lr: 0.00001
 ft_num_epochs: 50
 use_mask: true
+split_mask: true

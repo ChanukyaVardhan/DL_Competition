@@ -8,6 +8,18 @@ from torch.utils.data import Dataset
 
 from openstl.datasets.utils import create_loader
 
+def get_class_ids(id):
+    if id == 0:
+        return id
+    else:
+        id -= 1
+        s_id = id // 16
+        id = id % 16
+        m_id = id // 8
+        id = id % 8
+        c_id = id
+
+        return s_id, m_id, c_id
 
 class Clevrer(Dataset):
 
@@ -22,6 +34,7 @@ class Clevrer(Dataset):
         self.img_channels = params.get('channels', 3)
         self.transform = transform
         self.use_mask = params.get('use_mask', False)
+        self.split_mask = params.get('split_mask', False)
 
         # FIX : Possibly need to normalize the data.
         self.mean = 0
@@ -84,7 +97,9 @@ class Clevrer(Dataset):
 
             # Set 255 to all mask values greater than 49
             mask[mask >= 49] = 255
-
+            if self.split_mask:
+                #
+            
             output_mask = mask[output_frames]
             return input_images, output_images, output_mask.long()
 
