@@ -95,6 +95,9 @@ if __name__ == "__main__":
     model_params_before = count_parameters(model)
     print("Model parameters before fixing : ", model_params_before)
 
+    for param in model.parameters():
+        param.requires_grad = False
+
     sim_vp_model_path = params["model_path"]
     model.load_state_dict(torch.load(sim_vp_model_path))
     print("SimVP model loaded from {}".format(sim_vp_model_path))
@@ -106,9 +109,11 @@ if __name__ == "__main__":
 
     # Replace the final two layers of the model to output segmentation masks
     C_hid = model.dec.readout.in_channels
-    model.dec.dec[3] = ConvSC(
-        C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
-    model.dec.readout = nn.Conv2d(C_hid, num_classes, 1)
+    # model.dec.dec[3] = ConvSC(
+    #     C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
+    model.dec.readout = nn.Sequential(*[nn.Conv2d(C_hid, C_hid * 4, 3, padding="same"),
+                                       nn.SiLU(True),
+                                       nn.Conv2d(C_hid * 4, num_classes, 1)])
 
     model_params_after = count_parameters(model)
     print("Model parameters after fixing and adding 2 new layers: ", model_params_after)
@@ -159,7 +164,7 @@ if __name__ == "__main__":
         wandb.log({"train_loss_total": train_loss, "epoch_time": epoch_time})
 
         # Validation loop
-        if epoch % 3 == 0:
+        if epoch % 2 == 0:
             model.eval()
             eval_loss = 0.0
             stacked_pred = []
@@ -176,9 +181,14 @@ if __name__ == "__main__":
                 
 #                     loss = criterion(output_pred_flat, mask_flat)
 #                     eval_loss += loss.item()
-
+                    B, T, C, H, W = outputs_pred.shape
+                    outputs_pred_all = outputs_pred.view(B*T, C, H, W)
+                    output_mask = gt_masks.view(B*T, H, W)
+                    loss = criterion(outputs_pred_all, output_mask)
+                    eval_loss += loss.item()
+                    
                     pred_mask = torch.argmax(outputs_pred, dim=1)
-                    stacked_pred.append(pred_mask[:, -1, :, :].cpu())
+                    stacked_pred.append(outputs_pred[:, -1, :, :].cpu())
                     stacked_gt.append(gt_masks[:, -1, :, :].cpu())
 
                     if i % 100 == 0:
