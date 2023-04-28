@@ -64,7 +64,6 @@ class SimVP(Base_method):
 
         end = time.time()
         for idx, (batch_x, batch_y) in enumerate(train_pbar):
-            print(f"Shape of x on device {self.device} = {batch_x.shape}")
 
             data_time_m.update(time.time() - end)
             self.model_optim.zero_grad()
