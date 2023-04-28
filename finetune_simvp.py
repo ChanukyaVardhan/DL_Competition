@@ -111,7 +111,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     optimizer = torch.optim.Adam(model.parameters(), lr=params["ft_lr"])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True)
     scaler = GradScaler()
 
     # Training loop
