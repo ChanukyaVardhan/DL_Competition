@@ -143,7 +143,7 @@ class FINAL_Model(nn.Module):
             self.seg.load_state_dict(torch.load(
                 self.segmentation_path, map_location='cpu')["model"])
             self.seg.eval()
-            print("Loaded segmentation model!")
+            print(f"Loaded {self.segmentation} segmentation model!")
         elif self.segmentation == "deeplabv3":
             from torchvision.models.segmentation import deeplabv3_resnet50
             self.seg = deeplabv3_resnet50(
@@ -151,7 +151,7 @@ class FINAL_Model(nn.Module):
             self.seg.load_state_dict(torch.load(
                 self.segmentation_path, map_location='cpu'))
             self.seg.eval()
-            print("Loaded segmentation model!")
+            print(f"Loaded {self.segmentation} segmentation model!")
         else:
             raise Exception("FIX THIS!")
 
@@ -184,10 +184,10 @@ class FINAL_Model(nn.Module):
             else:
                 target_mask = None
         elif self.segmentation == "deeplabv3":
-            pred_mask = self.seg(pred_image)
+            pred_mask = self.seg(pred_image)['out']
             pred_mask = torch.argmax(pred_mask, dim=1)
             if self.split != "test" and self.split != "unlabeled":
-                target_mask = self.seg(target_image)
+                target_mask = self.seg(target_image)['out']
                 target_mask = torch.argmax(target_mask, dim=1)
             else:
                 target_mask = None
@@ -199,13 +199,15 @@ class FINAL_Model(nn.Module):
 
 split = "val"  # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
 num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
-data_dir = "./data"
+data_dir = "/vast/snm6477/DL_Finals/Dataset_Student"
 # video_predictor = "convttlstm"
 # video_predictor_path = "./checkpoints/convttlstm_best.pt"
 video_predictor = "simvp"
+video_predictor_path = "./checkpoints/simvp_checkpoint_unnormalized.pth"
 video_predictor_path = "./checkpoints/simvp_checkpoint.pth"
-segmentation = "segnext"
+segmentation = "deeplabv3"
 segmentation_path = "./checkpoints/segmentation_default_pretrain_model.pt"
+segmentation_path = "./checkpoints/deeplab_v3_segmentation_model_50.pth"
 
 if video_predictor == "convttlstm":
     transform = transforms.Compose([
@@ -217,6 +219,11 @@ elif video_predictor == "simvp":
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
+#     transform = transforms.Compose([
+#         transforms.ToTensor(),
+#         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+#                              0.0571, 0.0567, 0.0614])
+#     ])
 else:
     raise Exception("FIX THIS!")
 
@@ -224,7 +231,7 @@ else:
 dataset = TEST_Dataset(
     data_dir=data_dir, num_samples=num_samples, transform=transform, split=split)
 
-batch_size = 4
+batch_size = 16
 dataloader = torch.utils.data.DataLoader(
     dataset, batch_size=batch_size, drop_last=False, num_workers=4, shuffle=False)
 
