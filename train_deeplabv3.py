@@ -13,6 +13,20 @@ import wandb
 import numpy as np
 from utils import class_labels
 
+mean = [0.5061, 0.5045, 0.5008]
+std = [0.0571, 0.0567, 0.0614]
+unnormalize_transform = transforms.Compose([
+    transforms.Normalize(
+        mean=[-m/s for m, s in zip(mean, std)], std=[1/s for s in std]),
+])
+to_pil = transforms.ToPILImage()
+
+
+def unnormalize(img):
+    unnormalized_image = unnormalize_transform(img)
+    pil_image = to_pil(unnormalized_image)
+
+    return pil_image
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -20,7 +34,7 @@ def count_parameters(model):
 
 def plot_masks(pred_mask, gt_mask, image, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
-    image = image.astype(np.uint8).transpose(1, 2, 0)
+    image = unnormalize(image)
 
     return wandb.Image(image, masks={
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
@@ -145,7 +159,7 @@ for epoch in range(num_epochs):
 
                 if i % 100 == 0:
                     mask = plot_masks(pred_mask[0].cpu().numpy(
-                    ), gt_mask[0].cpu().numpy(), images[0].cpu.numpy(), i)
+                    ), gt_mask[0].cpu().numpy(), images[0].cpu(), i)
                     wandb.log({"val_predictions": mask})
 
         stacked_pred = torch.cat(stacked_pred, 0)
