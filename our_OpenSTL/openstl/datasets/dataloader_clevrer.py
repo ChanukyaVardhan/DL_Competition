@@ -82,6 +82,9 @@ class Clevrer(Dataset):
             mask = torch.FloatTensor(np.load(mask_path)) if os.path.exists(mask_path) else \
                 torch.zeros(self.num_frames, self.img_height, self.img_width)
 
+            # Set 255 to all mask values greater than 49
+            mask[mask >= 49] = 255
+
             output_mask = mask[output_frames]
             return input_images, output_images, output_mask.long()
 
