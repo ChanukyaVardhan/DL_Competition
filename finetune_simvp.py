@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
                 if eval_loss < min_val_loss:
                     min_val_loss = eval_loss
-                    torch.save(model.state_dict(),
+                    torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(),
                                f'simvp_segmentation_model_{epoch}.pth')
                     print(
                         f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
