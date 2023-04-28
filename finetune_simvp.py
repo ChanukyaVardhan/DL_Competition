@@ -36,6 +36,14 @@ def unnormalize(img):
 
     return pil_image
 
+def create_collage(images, width, height):
+    collage = Image.new("RGB", (width, height))
+    x_offset = 0
+    for img in images:
+        img = img.resize((width // len(images), height))
+        collage.paste(img, (x_offset, 0))
+        x_offset += img.width
+    return collage
 
 def plot_masks(pred_mask, gt_mask, image, idx):
     # Plot the predicted mask and the ground truth mask side by side with the IoU score
@@ -116,14 +124,17 @@ if __name__ == "__main__":
 
         start_time = time()
 
-        for idx, (input_images, output_images, output_mask) in enumerate(train_loader):
+        for idx, (input_images, output_images, output_mask) in tqdm(enumerate(train_loader)):
             input_images, output_mask = input_images.to(
                 device), output_mask.to(device)
             optimizer.zero_grad()
 
             with autocast(enabled=False):
                 outputs_pred = model(input_images)
-                loss = criterion(outputs_pred, output_mask)
+#                 print(outputs_pred.shape, output_mask.shape)
+                output_pred_flat = outputs_pred.view(-1, num_classes)
+                mask_flat = output_mask.view(-1)
+                loss = criterion(output_pred_flat, mask_flat)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -133,7 +144,7 @@ if __name__ == "__main__":
                 wandb.log({"train_loss": loss.item()})
 
         train_loss /= len(train_loader)
-        epoch_time = time.time() - start_time
+        epoch_time = time() - start_time
 
         wandb.log({"train_loss_total": train_loss, "epoch_time": epoch_time})
 
@@ -146,19 +157,22 @@ if __name__ == "__main__":
             jaccard = torchmetrics.JaccardIndex(
                 task="multiclass", num_classes=params["num_classes"])
             with torch.no_grad():
-                for i, (images, output, gt_masks) in enumerate(val_loader):
+                for i, (images, output, gt_masks) in tqdm(enumerate(val_loader)):
                     images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
-                    loss = criterion(outputs_pred, gt_masks)
+                    output_pred_flat = outputs_pred.view(-1, num_classes)
+                    mask_flat = gt_masks.view(-1)
+                
+                    loss = criterion(output_pred_flat, mask_flat)
                     eval_loss += loss.item()
 
                     pred_mask = torch.argmax(outputs_pred, dim=1)
-                    stacked_pred.append(pred_mask.cpu())
-                    stacked_gt.append(gt_masks.cpu())
+                    stacked_pred.append(pred_mask[:,-1,:,:].cpu())
+                    stacked_gt.append(gt_masks[:,-1,:,:].cpu())
 
                     if i % 100 == 0:
-                        mask = plot_masks(pred_mask[0].cpu().numpy(
-                        ), gt_masks[0].cpu().numpy(), images[0].cpu(), i)
+                        mask = plot_masks(pred_mask[0][-1].cpu().numpy(
+                        ), gt_masks[0][-1].cpu().numpy(), output[0][-1], i)
                         wandb.log({"val_predictions": mask})
 
                 stacked_pred = torch.cat(stacked_pred, dim=0)

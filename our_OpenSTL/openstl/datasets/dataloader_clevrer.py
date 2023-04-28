@@ -21,7 +21,8 @@ class Clevrer(Dataset):
         self.img_width      = params.get('height', 240)
         self.img_channels   = params.get('channels', 3)
         self.transform      = transform
-        self.use_mask = params.get('use_mask', False)
+        # FIX !!. Very important
+        self.use_mask = params.get('use_mask', True)
 
         # FIX : Possibly need to normalize the data.
         self.mean = 0
@@ -77,7 +78,7 @@ class Clevrer(Dataset):
                 torch.zeros(self.num_frames, self.img_height, self.img_width)
         
             output_mask = mask[output_frames]
-            return input_images, output_images, output_mask
+            return input_images, output_images, output_mask.long()
             
         # order: num_frames(0) x img_channel(1) x img_height(2) x img_width(3) : 22 x 3 x 160 x 240
         return input_images, output_images
