@@ -110,7 +110,7 @@ if __name__ == "__main__":
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
-    criterion = nn.CrossEntropyLoss()  # For segmentation tasks
+    criterion = nn.CrossEntropyLoss(ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     optimizer = torch.optim.Adam(model.parameters(), lr=params["ft_lr"])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -135,15 +135,16 @@ if __name__ == "__main__":
             with autocast(enabled=False):
                 outputs_pred = model(input_images)
 #                 print(outputs_pred.shape, output_mask.shape)
-                output_pred_flat = outputs_pred.view(-1, num_classes)
-                mask_flat = output_mask.view(-1)
-                loss = criterion(output_pred_flat, mask_flat)
+                B, T, C, H, W = outputs_pred.shape
+                outputs_pred = outputs_pred.view(B*T, C, H, W)
+                output_mask = output_mask.view(B*T, H, W)
+                loss = criterion(outputs_pred, output_mask)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
-            if idx % 10 == 0:
+            if idx % 25 == 0:
                 wandb.log({"train_loss": loss.item()})
 
         train_loss /= len(train_loader)
@@ -152,7 +153,7 @@ if __name__ == "__main__":
         wandb.log({"train_loss_total": train_loss, "epoch_time": epoch_time})
 
         # Validation loop
-        if epoch % 5 == 0:
+        if epoch % 3 == 0:
             model.eval()
             eval_loss = 0.0
             stacked_pred = []
@@ -163,11 +164,12 @@ if __name__ == "__main__":
                 for i, (images, output, gt_masks) in tqdm(enumerate(val_loader)):
                     images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
-                    output_pred_flat = outputs_pred.view(-1, num_classes)
-                    mask_flat = gt_masks.view(-1)
-
-                    loss = criterion(output_pred_flat, mask_flat)
-                    eval_loss += loss.item()
+                    
+#                     output_pred_flat = outputs_pred.view(-1, num_classes)
+#                     mask_flat = gt_masks.view(-1)
+                
+#                     loss = criterion(output_pred_flat, mask_flat)
+#                     eval_loss += loss.item()
 
                     pred_mask = torch.argmax(outputs_pred, dim=1)
                     stacked_pred.append(pred_mask[:, -1, :, :].cpu())
