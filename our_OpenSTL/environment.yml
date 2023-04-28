@@ -16,4 +16,5 @@ dependencies:
     - tqdm
     - opencv-python
     - wandb
+    - torchmetrics
 prefix: /opt/anaconda3/envs/simvp

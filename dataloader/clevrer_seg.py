@@ -9,7 +9,7 @@ import torchvision.transforms as transforms
 
 class CLEVRERSegDataset(Dataset):
 
-    def __init__(self, data_dir='./data/', split='train', user_transforms=None, num_samples=None):
+    def __init__(self, data_dir='./data/', split='train', user_transforms=None, mask_transform=None, num_samples=None):
         self.data_dir = data_dir
         self.split = split
 
@@ -23,8 +23,13 @@ class CLEVRERSegDataset(Dataset):
 
         if split == 'val' and num_samples is not None:
             self.image_paths = random.sample(self.image_paths, num_samples)
+        
+        # FIX : 
+#         if (split == 'train'):
+#             self.image_paths = self.image_paths[0:64]
 
         self.transforms = user_transforms
+        self.mask_transform = mask_transform
 
     def __len__(self):
         return len(self.image_paths)
@@ -41,13 +46,16 @@ class CLEVRERSegDataset(Dataset):
 
         # Set 255 to all mask values greater than 49
         mask[mask > 49] = 255
-
+        seed = torch.randint(0, 2**32, size=()).item()
+        
         if self.transforms is not None:
-            seed = torch.randint(0, 2**32, size=()).item()
+            # seed = torch.randint(0, 2**32, size=()).item()
             # Ensure the same transform is applied to both image and mask
+#             torch.manual_seed(seed)
             torch.manual_seed(seed)
             image = self.transforms(image)
+            assert(self.mask_transform is not None)
             torch.manual_seed(seed)
-            mask = self.transform(mask)
+            mask = self.mask_transform(mask)
 
         return image, mask.long()

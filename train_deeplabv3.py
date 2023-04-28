@@ -28,6 +28,7 @@ def unnormalize(img):
 
     return pil_image
 
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -74,7 +75,7 @@ if num_gpus > 1:  # Multiple GPUs
     params["num_workers"] *= num_gpus
 
 wandb.init(
-    entity="dl_competition_deeplabv3",
+    entity="dl_competition",
     config=params,
 )
 
@@ -84,15 +85,20 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
-    transforms.RandomRotation(30),
+    # transforms.RandomRotation(30),
     transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
         0.0571, 0.0567, 0.0614])
 ])
+transform_mask = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    # transforms.RandomRotation(30)
+])
 data_dir = params["data_dir"]
 train_dataset = CLEVRERSegDataset(
-    data_dir=data_dir, split='train', user_transforms=transform)
+    data_dir=data_dir, split='train', user_transforms=transform, mask_transform=transform_mask)
 val_dataset = CLEVRERSegDataset(
-    data_dir=data_dir, split='val', user_transforms=transform)
+    data_dir=data_dir, split='val', user_transforms=transform, mask_transform=transform_mask, num_samples=1000)
 
 train_loader = DataLoader(
     train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
@@ -111,12 +117,12 @@ model.to(device)
 # Set up the loss function and optimizer
 criterion = nn.CrossEntropyLoss(ignore_index=255)
 optimizer = optim.Adam(
-    model.parameters(), lr=params['lr'], weight_decay=params['weight_decay'])
+    model.parameters(), lr=float(params['lr']), weight_decay=float(params['weight_decay']))
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, 'min', factor=0.5, verbose=True, min_lr=1e-6)
 
 # Training loop
-num_epochs = params["num_epochs"]
+num_epochs = int(params["num_epochs"])
 min_val_loss = float('inf')
 for epoch in range(num_epochs):
     model.train()
@@ -175,12 +181,15 @@ for epoch in range(num_epochs):
         # Save the best evaluation loss model
         if eval_loss < min_val_loss:
             min_val_loss = eval_loss
-            torch.save(model.module.state_dict(),
+            # FIX: model.module
+            torch.save(model.state_dict(),
                        f'deeplab_v3_segmentation_model_{epoch}.pth')
 
 
 # Save the trained model
 # Access the inner model for saving
-torch.save(model.module.state_dict(), 'deeplab_v3_segmentation_model.pth')
+
+# FIX: model.module
+torch.save(model.state_dict(), 'deeplab_v3_segmentation_model.pth')
 
 wandb.finish()
