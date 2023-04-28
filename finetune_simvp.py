@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from PIL import Image
 import os
-import glob
+import sys
 from tqdm import tqdm
 from time import time
 import numpy as np
@@ -21,7 +21,6 @@ from train_seg import get_parameters, eval_epoch
 from utils import class_labels
 
 
-
 mean = [0.5061, 0.5045, 0.5008]
 std = [0.0571, 0.0567, 0.0614]
 unnormalize_transform = transforms.Compose([
@@ -29,6 +28,7 @@ unnormalize_transform = transforms.Compose([
         mean=[-m/s for m, s in zip(mean, std)], std=[1/s for s in std]),
 ])
 to_pil = transforms.ToPILImage()
+
 
 def unnormalize(img):
     unnormalized_image = unnormalize_transform(img)
@@ -45,7 +45,8 @@ def plot_masks(pred_mask, gt_mask, image, idx):
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
         "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
     })
-    
+
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -61,9 +62,9 @@ if __name__ == "__main__":
     if num_gpus > 1:  # Multiple GPUs
         params["batch_size"] *= num_gpus
         params["num_workers"] *= num_gpus
-    
+
     wandb.init(
-       entity="finetune_simvp",
+        entity="dl_competition",
         config=params,
     )
 
@@ -79,7 +80,8 @@ if __name__ == "__main__":
     # exp = BaseExperiment(args)
 
     model = SimVP_Model(**config)
-    model = nn.DataParallel(model).to(device) if num_gpus > 1 else model.to(device)
+    model = nn.DataParallel(model).to(
+        device) if num_gpus > 1 else model.to(device)
 
     sim_vp_model_path = params["model_path"]
     model.load_state_dict(torch.load(sim_vp_model_path))
@@ -92,7 +94,7 @@ if __name__ == "__main__":
 
     # Replace the final two layers of the model to output segmentation masks
     C_hid = model.dec.readout.in_channels
-    model.dec[3] = ConvSC(
+    model.dec.dec[3] = ConvSC(
         C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
     model.dec.readout = nn.Conv2d(C_hid, num_classes, 1)
 
@@ -101,76 +103,79 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=params["ft_lr"])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
     scaler = GradScaler()
-    
+
     # Training loop
     num_epochs = params["ft_num_epochs"]
     min_val_loss = float('inf')
-    
+
     for epoch in range(num_epochs):
         model.train()
         train_loss = 0.0
 
         start_time = time()
-        
+
         for idx, (input_images, output_images, output_mask) in enumerate(train_loader):
-            input_images, output_mask = input_images.to(device), output_mask.to(device)
+            input_images, output_mask = input_images.to(
+                device), output_mask.to(device)
             optimizer.zero_grad()
-            
+
             with autocast():
                 outputs_pred = model(input_images)
                 loss = criterion(outputs_pred, output_mask)
-            
+
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            
+
             if idx % 10 == 0:
                 wandb.log({"train_loss": loss.item()})
-            
-        
+
         train_loss /= len(train_loader)
         epoch_time = time.time() - start_time
-        
+
         wandb.log({"train_loss_total": train_loss, "epoch_time": epoch_time})
 
         # Validation loop
-        if epoch % 5 ==0:
+        if epoch % 5 == 0:
             model.eval()
             eval_loss = 0.0
             stacked_pred = []
             stacked_gt = []
-            jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=params["num_classes"])
+            jaccard = torchmetrics.JaccardIndex(
+                task="multiclass", num_classes=params["num_classes"])
             with torch.no_grad():
                 for i, (images, output, gt_masks) in enumerate(val_loader):
                     images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
                     loss = criterion(outputs_pred, gt_masks)
                     eval_loss += loss.item()
-                    
+
                     pred_mask = torch.argmax(outputs_pred, dim=1)
                     stacked_pred.append(pred_mask.cpu())
                     stacked_gt.append(gt_masks.cpu())
-                    
+
                     if i % 100 == 0:
                         mask = plot_masks(pred_mask[0].cpu().numpy(
                         ), gt_masks[0].cpu().numpy(), images[0].cpu(), i)
                         wandb.log({"val_predictions": mask})
-                
+
                 stacked_pred = torch.cat(stacked_pred, dim=0)
                 stacked_gt = torch.cat(stacked_gt, dim=0)
                 jaccard_score = jaccard(stacked_pred, stacked_gt)
                 eval_loss /= len(val_loader)
-                
-                wandb.log({"val_loss_total": eval_loss, "jaccard_score": jaccard_score})   
-                
+
+                wandb.log({"val_loss_total": eval_loss,
+                          "jaccard_score": jaccard_score})
+
                 scheduler.step(eval_loss)
-                
+
                 if eval_loss < min_val_loss:
                     min_val_loss = eval_loss
-                    torch.save(model.state_dict(), f'simvp_segmentation_model_{epoch}.pth')
-                    print(f"Model saved at epoch {epoch} with val loss: {min_val_loss}")       
-            
-            
+                    torch.save(model.state_dict(),
+                               f'simvp_segmentation_model_{epoch}.pth')
+                    print(
+                        f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
+
     # Save the trained model
     # Access the inner model for saving
     torch.save(model.module.state_dict(), 'simvp_segmentation_model.pth')
