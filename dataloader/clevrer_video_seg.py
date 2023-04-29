@@ -16,13 +16,13 @@ class CLEVRERVideoSeg(Dataset):
         self.split = split 		# train/unlabeled/val/test
         self.path = os.path.join(self.data_dir, self.split)
         self.start_frame = 0
-        self.num_frames = 11
+        self.num_frames = 22
         self.transform = transform
 
         self.video_ids = sorted([v for v in os.listdir(
             self.path) if os.path.isdir(os.path.join(self.path, v))])
         # FIX - UNCOMMENT THIS TO RUN LOCALLY
-        self.video_ids = self.video_ids[:5]
+#         self.video_ids = self.video_ids[:5]
 
     def __len__(self):
         return len(self.video_ids)
