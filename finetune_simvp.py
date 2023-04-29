@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 from torch.cuda.amp import GradScaler, autocast
 import wandb
 
-from our_OpenSTL.openstl.models import SimVP_Model
+from our_OpenSTL.openstl.models import SimVP_Model, Decoder
 from our_OpenSTL.openstl.datasets import load_data
 from our_OpenSTL.openstl.modules import ConvSC
 # from our_OpenSTL.openstl.api import BaseExperiment
@@ -145,16 +145,24 @@ if __name__ == "__main__":
     sim_vp_model_path = params["model_path"]
     num_classes = params["num_classes"]
 
-#     model = SimVP_Model(**config)
+    model = SimVP_Model(**config)
+    model.load_state_dict(torch.load(sim_vp_model_path))
 
-#     model.load_state_dict(torch.load(sim_vp_model_path))
-#     print("SimVP model loaded from {}".format(sim_vp_model_path))
-#     print("SimVP model architecture: ")
-# #     print(model)
-#     print("Number of parameters: {}".format(count_parameters(model)))
+    # Freeze all layers
+    for param in model.parameters():
+        param.requires_grad = False
+
+    print(f"Number of trainable parameters: {count_parameters(model)}")
+    # New decoder
+    T, C, H, W = config["in_shape"]
+    model.dec = Decoder(config["hid_S"], C,
+                        config["N_S"], config["spatio_kernel_dec"])
+    model.dec.readout = nn.Conv2d(config["hid_S"], num_classes, kernel_size=1)
+    print("SimVP model loaded from {}".format(sim_vp_model_path))
+    print(f"Number of trainable parameters: {count_parameters(model)}")
 
     # Replace the final two layers of the model to output segmentation masks
-    model = SimVPSegmentor(config, sim_vp_model_path)
+    # model = SimVPSegmentor(config, sim_vp_model_path)
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
@@ -213,11 +221,11 @@ if __name__ == "__main__":
                     images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
 
-#                     output_pred_flat = outputs_pred.view(-1, num_classes)
-#                     mask_flat = gt_masks.view(-1)
-
-#                     loss = criterion(output_pred_flat, mask_flat)
-#                     eval_loss += loss.item()
+                    B, T, C, H, W = outputs_pred.shape
+                    outputs_pred = outputs_pred.view(B*T, C, H, W)
+                    output_mask = gt_masks.view(B*T, H, W)
+                    loss = criterion(outputs_pred, output_mask)
+                    eval_loss += loss.item()
 
                     pred_mask = torch.argmax(outputs_pred, dim=1)
                     stacked_pred.append(pred_mask[:, -1, :, :].cpu())
