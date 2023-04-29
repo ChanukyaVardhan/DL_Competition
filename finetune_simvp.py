@@ -31,7 +31,6 @@ to_pil = transforms.ToPILImage()
 
 
 def unnormalize(img):
-    # unnormalized_image = unnormalize_transform(img)
     pil_image = to_pil(img)
 
     return pil_image
@@ -88,31 +87,11 @@ if __name__ == "__main__":
         "num_classes": params["num_classes"],
     }
     # exp = BaseExperiment(args)
-
-    model = SimVP_Model(**config)
-
-    model_params_before = count_parameters(model)
-    print("Model parameters before fixing : ", model_params_before)
-
-    for param in model.parameters():
-        param.requires_grad = False
-
     sim_vp_model_path = params["model_path"]
     num_classes = params["num_classes"]
 
-    # Replace the final two layers of the model to output segmentation masks
-    C_hid = model.dec.readout.in_channels
-    model.dec.dec[3] = ConvSC(
-        C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
-    model.dec.readout = nn.Sequential(*[nn.Conv2d(C_hid, C_hid * 4, 3, padding="same"),
-                                        nn.SiLU(True),
-                                        nn.Conv2d(C_hid * 4, num_classes, 1)])
-
-    # model.dec.readout =
-
-    model_params_after = count_parameters(model)
-    print("Model parameters after fixing and adding 2 new layers: ",
-          model_params_after)
+    model = SimVP_Model(**config)
+    model.load_state_dict(torch.load(sim_vp_model_path))
 
     # Freeze all layers
 #     for param in model.parameters():
@@ -186,7 +165,7 @@ if __name__ == "__main__":
         scheduler.step()
 
         # Validation loop
-        if epoch % 2 == 0:
+        if epoch % 1 == 0:
             model.eval()
             eval_loss = 0.0
             stacked_pred = []
@@ -198,11 +177,6 @@ if __name__ == "__main__":
                     images, gt_masks = images.to(device), gt_masks.to(device)
                     outputs_pred = model(images)
 
-#                     output_pred_flat = outputs_pred.view(-1, num_classes)
-#                     mask_flat = gt_masks.view(-1)
-
-#                     loss = criterion(output_pred_flat, mask_flat)
-#                     eval_loss += loss.item()
                     B, T, C, H, W = outputs_pred.shape
                     outputs_pred_all = outputs_pred.view(B*T, C, H, W)
                     output_mask = gt_masks.view(B*T, H, W)
@@ -228,8 +202,8 @@ if __name__ == "__main__":
 
                 if eval_loss < min_val_loss:
                     min_val_loss = eval_loss
-                    torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(),
-                               f'simvp_segmentation_model_{epoch}.pth')
+                    torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
+                    ), f'./checkpoints/ft_simvp_segmentation_model_{epoch}.pth')
                     print(
                         f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
 

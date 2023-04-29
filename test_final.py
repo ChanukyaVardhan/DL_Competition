@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
 from convttlstm.utils.convlstmnet import ConvLSTMNet
-from our_OpenSTL.openstl.models import SimVP_Model
+from our_OpenSTL.openstl.models import SimVP_Model, Decoder
 from segmentation import SegNeXT
 import torchmetrics
 import wandb
@@ -22,6 +22,18 @@ def plot_images(pred_mask, gt_mask, pred_image, image):
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
         "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
     }), wandb.Image(pred_image)
+
+
+simvp_config = {
+    "in_shape": [11, 3, 160, 240],
+    "hid_S": 64,
+    "hid_T": 512,
+    "N_S": 4,
+    "N_T": 8,
+    "spatio_kernel_enc": 3,
+    "spatio_kernel_dec": 3,
+    "num_classes": 49,
+}
 
 
 class TEST_Dataset(Dataset):
@@ -132,16 +144,7 @@ class FINAL_Model(nn.Module):
             self.m1.eval()
             print("Loaded convttlstm model!")
         elif self.video_predictor == "simvp":
-            config = {
-                "in_shape": [11, 3, 160, 240],
-                "hid_S": 64,
-                "hid_T": 512,
-                "N_S": 4,
-                "N_T": 8,
-                "spatio_kernel_enc": 3,
-                "spatio_kernel_dec": 3
-            }
-            self.m1 = SimVP_Model(**config)
+            self.m1 = SimVP_Model(**simvp_config)
             # self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cpu")["state_dict"])
             self.m1.load_state_dict(torch.load(
                 self.video_predictor_path, map_location="cpu"))
@@ -229,7 +232,7 @@ if video_predictor == "convttlstm":
         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                              0.0571, 0.0567, 0.0614])
     ])
-elif video_predictor == "simvp":
+elif "simvp" in video_predictor:
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -251,9 +254,18 @@ dataloader = torch.utils.data.DataLoader(
 
 print(f"Number of total samples = {len(dataset)}")
 
-model = FINAL_Model(video_predictor=video_predictor, video_predictor_path=video_predictor_path,
-                    segmentation=segmentation, segmentation_path=segmentation_path,
-                    split=split).cuda()
+if video_predictor == "ft_simvp":
+    model = SimVP_Model(**simvp_config)
+    T, C, H, W = simvp_config["in_shape"]
+    model.dec = Decoder(simvp_config["hid_S"], C,
+                        simvp_config["N_S"], simvp_config["spatio_kernel_dec"])
+    model.dec.readout = nn.Conv2d(
+        simvp_config["hid_S"], simvp_config, kernel_size=1)
+    model.load_state_dict(torch.load(video_predictor_path))
+else:
+    model = FINAL_Model(video_predictor=video_predictor, video_predictor_path=video_predictor_path,
+                        segmentation=segmentation, segmentation_path=segmentation_path,
+                        split=split).cuda()
 model.eval()
 total_params = sum(p.numel() for p in model.parameters())
 print(f"Number of model parameters - {total_params}")

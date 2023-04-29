@@ -11,11 +11,11 @@ N_S: 4
 
 # training
 lr: 0.001
-batch_size: 4
-val_batch_size: 4
+batch_size: 8
+val_batch_size: 16
 drop_path: 0
 sched: 'ReduceLROnPlateau'
-val_batch_size: 8
+val_batch_size: 16
 num_workers: 4
 data_root: /scratch/pj2251/DL/DL_Competition/data/Dataset_Student
 distributed: false
@@ -23,6 +23,7 @@ model_path: ./checkpoints/simvp_checkpoint.pth
 
 # Fine tuning
 num_classes: 49
-ft_lr: 0.01
+ft_lr: 0.001
 ft_num_epochs: 50
 use_mask: true
+split_mask: true

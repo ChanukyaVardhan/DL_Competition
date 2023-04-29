@@ -1,8 +1,10 @@
 # Copyright (c) CAIRI AI Lab. All rights reserved
 
 def load_data(dataname, batch_size, val_batch_size, num_workers, data_root, distributed=False, **kwargs):
-    pre_seq_length = kwargs.get('pre_seq_length', 10)  # FIX : Not used for clevrer
-    aft_seq_length = kwargs.get('aft_seq_length', 10)  # FIX : Not used for clevrer
+    # FIX : Not used for clevrer
+    pre_seq_length = kwargs.get('pre_seq_length', 10)
+    # FIX : Not used for clevrer
+    aft_seq_length = kwargs.get('aft_seq_length', 10)
     if dataname == 'kitticaltech':
         from .dataloader_kitticaltech import load_data
         return load_data(batch_size, val_batch_size, data_root, num_workers,
@@ -21,6 +23,8 @@ def load_data(dataname, batch_size, val_batch_size, num_workers, data_root, dist
         params = {}
         params['path'] = data_root
         params['num_frames'] = 22
+        params['use_mask'] = kwargs.get('use_mask', False)
+        params['split_mask'] = kwargs.get('split_mask', False)
         transform = transforms.ToTensor()
         return load_data(batch_size, val_batch_size, params, transform, data_root, num_workers,
                          pre_seq_length, aft_seq_length, distributed=distributed)  # FIX : Change the loader.

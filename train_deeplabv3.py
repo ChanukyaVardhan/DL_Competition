@@ -12,6 +12,7 @@ from dataloader import CLEVRERSegDataset
 import wandb
 import numpy as np
 from utils import class_labels
+from models import count_parameters
 
 mean = [0.5061, 0.5045, 0.5008]
 std = [0.0571, 0.0567, 0.0614]
@@ -27,9 +28,6 @@ def unnormalize(img):
     pil_image = to_pil(unnormalized_image)
 
     return pil_image
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 def plot_masks(pred_mask, gt_mask, image, idx):
