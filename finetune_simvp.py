@@ -19,7 +19,7 @@ from our_OpenSTL.openstl.modules import ConvSC
 import torchmetrics
 from train_seg import get_parameters, eval_epoch
 from utils import class_labels, shapes, materials, colors
-from losses import FocalLoss
+from models import count_parameters
 
 mean = [0.5061, 0.5045, 0.5008]
 std = [0.0571, 0.0567, 0.0614]
@@ -56,61 +56,7 @@ def plot_masks(pred_mask, gt_mask, image, idx):
     })
 
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
 # Use simvp as the backbone and add new heads for multi-class segmentation
-class SimVPSegmentor(nn.Module):
-    def __init__(self, config, sim_vp_model_path) -> None:
-        super().__init__()
-
-        self.simvp = SimVP_Model(**config)
-        self.load_simvp_weights(sim_vp_model_path)
-        C_hid = self.simvp.dec.readout.in_channels
-        # unroll simvp and add new heads
-        self.simvp.dec.readout = nn.Conv2d(C_hid, C_hid, kernel_size=1)
-
-        self.shape_head = nn.Conv2d(C_hid, len(shapes), kernel_size=1)
-        self.material_head = nn.Conv2d(C_hid, len(materials), kernel_size=1)
-        self.color_head = nn.Conv2d(C_hid, len(colors), kernel_size=1)
-
-        self.simvp.dec.readout.apply(self._init_weights)
-        self.shape_head.apply(self._init_weights)
-        self.material_head.apply(self._init_weights)
-        self.color_head.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal_(
-                m.weight, mode="fan_out", nonlinearity="relu")
-
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        # x: [B, T, 3, H, W]
-        # simvp_out: [B, T, C, H, W]
-        simvp_out = self.simvp(x)
-        B, T, C, H, W = simvp_out.shape
-
-        simvp_out = simvp_out.view(B*T, C, H, W)
-
-        shape_out = self.shape_head(simvp_out)
-        material_out = self.material_head(simvp_out)
-        color_out = self.color_head(simvp_out)
-
-        shape_out = shape_out.view(B, T, -1, H, W)
-        material_out = material_out.view(B, T, -1, H, W)
-        color_out = color_out.view(B, T, -1, H, W)
-
-        return shape_out, material_out, color_out
-
-    def load_simvp_weights(self, simvp_model_path):
-        self.simvp.load_state_dict(torch.load(simvp_model_path))
-        print("SimVP model loaded from {}".format(simvp_model_path))
-        print("SimVP model architecture: ")
-        print("Number of parameters: {}".format(count_parameters(self.simvp)))
 
 
 if __name__ == "__main__":
@@ -152,7 +98,7 @@ if __name__ == "__main__":
 #         param.requires_grad = False
     encoder_params = model.enc.parameters()
     hidden_params = model.hid.parameters()
-    
+
     print(f"Number of trainable parameters: {count_parameters(model)}")
     # New decoder
     T, C, H, W = config["in_shape"]
@@ -171,7 +117,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     lr = params["ft_lr"]
-    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2}, 
+    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2},
                                   {'params': hidden_params, 'lr': lr*1e-2},
                                  {'params': decoder_params, 'lr': lr}])
 #     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -181,8 +127,9 @@ if __name__ == "__main__":
 
     # Training loop
     num_epochs = params["ft_num_epochs"]
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs//2, eta_min=1e-7, verbose=True)
-    
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=num_epochs//2, eta_min=1e-7, verbose=True)
+
     min_val_loss = float('inf')
 
     for epoch in range(num_epochs):
