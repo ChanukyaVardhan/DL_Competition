@@ -211,7 +211,9 @@ class FINAL_Model(nn.Module):
 
 split = "val"  # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
 num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
+
 data_dir = "/scratch/pj2251/DL/DL_Competition/data/Dataset_Student"
+
 # video_predictor = "convttlstm"
 # video_predictor_path = "./checkpoints/convttlstm_best.pt"
 video_predictor = "simvp"
@@ -231,6 +233,11 @@ elif video_predictor == "simvp":
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
+#     transform = transforms.Compose([
+#         transforms.ToTensor(),
+#         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+#                              0.0571, 0.0567, 0.0614])
+#     ])
 else:
     raise Exception("FIX THIS!")
 
