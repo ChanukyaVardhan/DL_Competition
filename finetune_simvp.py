@@ -196,7 +196,7 @@ if __name__ == "__main__":
                 device), output_mask.to(device)
             optimizer.zero_grad()
 
-            with autocast(enabled=True):
+            with autocast(enabled=False):
                 outputs_pred = model(input_images)
 #                 print(outputs_pred.shape, output_mask.shape)
                 B, T, C, H, W = outputs_pred.shape
