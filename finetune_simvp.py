@@ -222,12 +222,12 @@ if __name__ == "__main__":
                     outputs_pred = model(images)
 
                     B, T, C, H, W = outputs_pred.shape
-                    outputs_pred = outputs_pred.view(B*T, C, H, W)
+                    outputs_pred_all = outputs_pred.view(B*T, C, H, W)
                     output_mask = gt_masks.view(B*T, H, W)
-                    loss = criterion(outputs_pred, output_mask)
+                    loss = criterion(outputs_pred_all, output_mask)
                     eval_loss += loss.item()
 
-                    pred_mask = torch.argmax(outputs_pred, dim=1)
+                    pred_mask = torch.argmax(outputs_pred, dim=2)
                     stacked_pred.append(pred_mask[:, -1, :, :].cpu())
                     stacked_gt.append(gt_masks[:, -1, :, :].cpu())
 

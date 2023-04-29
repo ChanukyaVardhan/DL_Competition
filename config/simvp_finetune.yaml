@@ -11,10 +11,10 @@ N_S: 4
 
 # training
 lr: 0.001
-batch_size: 2
+batch_size: 8
 drop_path: 0
 sched: 'ReduceLROnPlateau'
-val_batch_size: 8
+val_batch_size: 16
 num_workers: 4
 data_root: /vast/snm6477/DL_Finals/Dataset_Student
 distributed: false
