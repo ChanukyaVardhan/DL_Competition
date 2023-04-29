@@ -69,9 +69,9 @@ with torch.no_grad():
             # cmap = mcolors.ListedColormap(colors)
             # for t in range(T):
             #     mask_img = mask_tensor[t]
-            #     mask_path = os.path.join(mask_dir, f'mask_{t}.png')
+            #     mask_path_t = os.path.join(mask_dir, f'mask_{t}.png')
             #     # Use matplotlib to save the image
-            #     plt.imsave(mask_path, mask_img, cmap=cmap)
+            #     plt.imsave(mask_path_t, mask_img, cmap=cmap)
             #     unique_labels = np.unique(mask_tensor[t])
             #     print(f"unique_labels in mask_{t}", unique_labels)
             #     from utils import get_class_name
