@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import transformer
+from our_OpenSTL.openstl.models import SimVP_Model, Decoder
+from utils import class_labels, shapes, materials, colors
 
 
 def count_parameters(model):
@@ -163,6 +165,37 @@ class SimVPSegmentor(nn.Module):
         color_out = color_out.view(B, T, -1, H, W)
 
         return shape_out, material_out, color_out
+
+    def load_simvp_weights(self, simvp_model_path):
+        self.simvp.load_state_dict(torch.load(simvp_model_path))
+        print("SimVP model loaded from {}".format(simvp_model_path))
+        print("SimVP model architecture: ")
+        print("Number of parameters: {}".format(count_parameters(self.simvp)))
+
+
+class SimVPJEPA(nn.Module):
+    def __init__(self, config, sim_vp_model_path=None) -> None:
+        self.simvp = SimVP_Model(**config)
+        if sim_vp_model_path is not None:
+            self.load_simvp_weights(sim_vp_model_path)
+
+        self.encoder = self.simvp.enc
+        self.predictor = self.simvp.hid
+        self.decoder = self.simvp.dec
+
+    def forward(self, input_images, pred_images):
+        B, T, C, H, W = input_images.shape
+        input_images = input_images.view(B*T, C, H, W)
+        x_encoding, x_skip = self.enc(input_images)
+        _, C_, H_, W_ = x_encoding.shape
+        z = x_encoding.view(B, T, C_, H_, W_)
+        x_encoding_pred = self.predictor(z)
+        x_encoding_pred = x_encoding_pred.reshape(B*T, C_, H_, W_)
+
+        pred_images = pred_images.view(B*T, C, H, W)
+        y_encoding, y_skip = self.enc(pred_images)
+
+        return x_encoding, x_encoding_pred, y_encoding
 
     def load_simvp_weights(self, simvp_model_path):
         self.simvp.load_state_dict(torch.load(simvp_model_path))
