@@ -75,6 +75,7 @@ class Clevrer(Dataset):
         video_path = self.video_paths[index]
 
         input_frames = [i for i in range(self.num_input_frames)]
+
         output_frames = [i for i in range(
             self.num_input_frames, self.num_input_frames + self.to_predict)]
 
@@ -91,17 +92,6 @@ class Clevrer(Dataset):
                 video_path, f"image_{index}.png"))
             output_images.append(image)
         output_images = torch.stack(output_images, dim=0)
-
-        if self.use_mask:
-            mask_path = os.path.join(video_path, "mask.npy")
-            mask = torch.FloatTensor(np.load(mask_path)) if os.path.exists(mask_path) else \
-                torch.zeros(self.num_frames, self.img_height, self.img_width)
-
-            # Set 255 to all mask values greater than 49
-            mask[mask >= 49] = 255
-
-            output_mask = mask[output_frames]
-            return input_images, output_images, output_mask.long()
 
         # order: num_frames(0) x img_channel(1) x img_height(2) x img_width(3) : 22 x 3 x 160 x 240
         return input_images, output_images

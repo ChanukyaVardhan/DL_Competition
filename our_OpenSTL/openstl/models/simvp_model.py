@@ -19,21 +19,18 @@ class SimVP_Model(nn.Module):
                  spatio_kernel_dec=3, **kwargs):
         super(SimVP_Model, self).__init__()
         T, C, H, W = in_shape  # T is pre_seq_length
-        # downsample 1 / 2**(N_S/2)
-        H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))
+        H, W = int(H / 2**(N_S/2)), int(W / 2**(N_S/2))  # downsample 1 / 2**(N_S/2)
 
         self.enc = Encoder(C, hid_S, N_S, spatio_kernel_enc)
         self.dec = Decoder(hid_S, C, N_S, spatio_kernel_dec)
-        self.num_classes = kwargs.get('num_classes', 3)
 
         model_type = 'gsta' if model_type is None else model_type.lower()
         if model_type == 'incepu':
             self.hid = MidIncepNet(T*hid_S, hid_T, N_T)
         else:
             self.hid = MidMetaNet(T*hid_S, hid_T, N_T,
-                                  input_resolution=(
-                                      H, W), model_type=model_type,
-                                  mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)
+                input_resolution=(H, W), model_type=model_type,
+                mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)
 
     def forward(self, x_raw, **kwargs):
         B, T, C, H, W = x_raw.shape
@@ -47,17 +44,15 @@ class SimVP_Model(nn.Module):
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
-        Y = Y.reshape(B, T, self.num_classes, H, W)
+        Y = Y.reshape(B, T, C, H, W)
 
         return Y
 
 
 def sampling_generator(N, reverse=False):
     samplings = [False, True] * (N // 2)
-    if reverse:
-        return list(reversed(samplings[:N]))
-    else:
-        return samplings[:N]
+    if reverse: return list(reversed(samplings[:N]))
+    else: return samplings[:N]
 
 
 class Encoder(nn.Module):
@@ -67,7 +62,7 @@ class Encoder(nn.Module):
         samplings = sampling_generator(N_S)
         super(Encoder, self).__init__()
         self.enc = nn.Sequential(
-            ConvSC(C_in, C_hid, spatio_kernel, downsampling=samplings[0]),
+              ConvSC( C_in, C_hid, spatio_kernel, downsampling=samplings[0]),
             *[ConvSC(C_hid, C_hid, spatio_kernel, downsampling=s) for s in samplings[1:]]
         )
 
@@ -86,9 +81,8 @@ class Decoder(nn.Module):
         samplings = sampling_generator(N_S, reverse=True)
         super(Decoder, self).__init__()
         self.dec = nn.Sequential(
-            *[ConvSC(C_hid, C_hid, spatio_kernel, upsampling=s)
-              for s in samplings[:-1]],
-            ConvSC(C_hid, C_hid, spatio_kernel, upsampling=samplings[-1])
+            *[ConvSC(C_hid, C_hid, spatio_kernel, upsampling=s) for s in samplings[:-1]],
+              ConvSC(C_hid, C_hid, spatio_kernel, upsampling=samplings[-1])
         )
         self.readout = nn.Conv2d(C_hid, C_out, 1)
 
@@ -103,29 +97,29 @@ class Decoder(nn.Module):
 class MidIncepNet(nn.Module):
     """The hidden Translator of IncepNet for SimVPv1"""
 
-    def __init__(self, channel_in, channel_hid, N2, incep_ker=[3, 5, 7, 11], groups=8, **kwargs):
+    def __init__(self, channel_in, channel_hid, N2, incep_ker=[3,5,7,11], groups=8, **kwargs):
         super(MidIncepNet, self).__init__()
         assert N2 >= 2 and len(incep_ker) > 1
         self.N2 = N2
         enc_layers = [gInception_ST(
-            channel_in, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
-        for i in range(1, N2-1):
+            channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        for i in range(1,N2-1):
             enc_layers.append(
                 gInception_ST(channel_hid, channel_hid//2, channel_hid,
                               incep_ker=incep_ker, groups=groups))
         enc_layers.append(
-            gInception_ST(channel_hid, channel_hid//2, channel_hid,
-                          incep_ker=incep_ker, groups=groups))
+                gInception_ST(channel_hid, channel_hid//2, channel_hid,
+                              incep_ker=incep_ker, groups=groups))
         dec_layers = [
-            gInception_ST(channel_hid, channel_hid//2, channel_hid,
-                          incep_ker=incep_ker, groups=groups)]
-        for i in range(1, N2-1):
+                gInception_ST(channel_hid, channel_hid//2, channel_hid,
+                              incep_ker=incep_ker, groups=groups)]
+        for i in range(1,N2-1):
             dec_layers.append(
                 gInception_ST(2*channel_hid, channel_hid//2, channel_hid,
                               incep_ker=incep_ker, groups=groups))
         dec_layers.append(
-            gInception_ST(2*channel_hid, channel_hid//2, channel_in,
-                          incep_ker=incep_ker, groups=groups))
+                gInception_ST(2*channel_hid, channel_hid//2, channel_in,
+                              incep_ker=incep_ker, groups=groups))
 
         self.enc = nn.Sequential(*enc_layers)
         self.dec = nn.Sequential(*dec_layers)
@@ -143,8 +137,8 @@ class MidIncepNet(nn.Module):
                 skips.append(z)
         # decoder
         z = self.dec[0](z)
-        for i in range(1, self.N2):
-            z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
+        for i in range(1,self.N2):
+            z = self.dec[i](torch.cat([z, skips[-i]], dim=1) )
 
         y = z.reshape(B, T, C, H, W)
         return y
@@ -165,14 +159,12 @@ class MetaBlock(nn.Module):
                 in_channels, kernel_size=21, mlp_ratio=mlp_ratio,
                 drop=drop, drop_path=drop_path, act_layer=nn.GELU)
         elif model_type == 'convmixer':
-            self.block = ConvMixerSubBlock(
-                in_channels, kernel_size=11, activation=nn.GELU)
+            self.block = ConvMixerSubBlock(in_channels, kernel_size=11, activation=nn.GELU)
         elif model_type == 'convnext':
             self.block = ConvNeXtSubBlock(
                 in_channels, mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)
         elif model_type == 'hornet':
-            self.block = HorNetSubBlock(
-                in_channels, mlp_ratio=mlp_ratio, drop_path=drop_path)
+            self.block = HorNetSubBlock(in_channels, mlp_ratio=mlp_ratio, drop_path=drop_path)
         elif model_type == 'mlp':
             self.block = MLPMixerSubBlock(
                 in_channels, input_resolution, mlp_ratio=mlp_ratio, drop=drop, drop_path=drop_path)

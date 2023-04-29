@@ -9,11 +9,12 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
 from convttlstm.utils.convlstmnet import ConvLSTMNet
-from our_OpenSTL.openstl.models import SimVP_Model, Decoder
+from our_OpenSTL.openstl.models import SimVP_Model
 from segmentation import SegNeXT
 import torchmetrics
 import wandb
-from utils import class_labels
+from matplotlib import pyplot as plt
+from utils import class_labels, get_unique_objects, apply_heuristics
 
 def plot_images(pred_mask, gt_mask, pred_image, image):
     
@@ -22,18 +23,6 @@ def plot_images(pred_mask, gt_mask, pred_image, image):
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
         "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
     }), wandb.Image(pred_image)
-
-
-simvp_config = {
-    "in_shape": [11, 3, 160, 240],
-    "hid_S": 64,
-    "hid_T": 512,
-    "N_S": 4,
-    "N_T": 8,
-    "spatio_kernel_enc": 3,
-    "spatio_kernel_dec": 3,
-    "num_classes": 49,
-}
 
 
 class TEST_Dataset(Dataset):
@@ -144,7 +133,16 @@ class FINAL_Model(nn.Module):
             self.m1.eval()
             print("Loaded convttlstm model!")
         elif self.video_predictor == "simvp":
-            self.m1 = SimVP_Model(**simvp_config)
+            config = {
+                "in_shape": [11, 3, 160, 240],
+                "hid_S": 64,
+                "hid_T": 512,
+                "N_S": 4,
+                "N_T": 8,
+                "spatio_kernel_enc": 3,
+                "spatio_kernel_dec": 3
+            }
+            self.m1 = SimVP_Model(**config)
             # self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cpu")["state_dict"])
             self.m1.load_state_dict(torch.load(
                 self.video_predictor_path, map_location="cpu"))
@@ -172,6 +170,7 @@ class FINAL_Model(nn.Module):
 
     def forward(self, input_images, target_images):
         # input_images -> B, 11, 3, 160 ,240
+        # input_images_clone = input_images.clone() # FIX : REMOVE THIS LATER
         if self.video_predictor == "convttlstm":
             pred_images = self.m1(input_images,
                                   input_frames=11, future_frames=11, output_frames=11, teacher_forcing=False)
@@ -232,7 +231,7 @@ if video_predictor == "convttlstm":
         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
                              0.0571, 0.0567, 0.0614])
     ])
-elif "simvp" in video_predictor:
+elif video_predictor == "simvp":
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
@@ -254,18 +253,9 @@ dataloader = torch.utils.data.DataLoader(
 
 print(f"Number of total samples = {len(dataset)}")
 
-if video_predictor == "ft_simvp":
-    model = SimVP_Model(**simvp_config)
-    T, C, H, W = simvp_config["in_shape"]
-    model.dec = Decoder(simvp_config["hid_S"], C,
-                        simvp_config["N_S"], simvp_config["spatio_kernel_dec"])
-    model.dec.readout = nn.Conv2d(
-        simvp_config["hid_S"], simvp_config, kernel_size=1)
-    model.load_state_dict(torch.load(video_predictor_path))
-else:
-    model = FINAL_Model(video_predictor=video_predictor, video_predictor_path=video_predictor_path,
-                        segmentation=segmentation, segmentation_path=segmentation_path,
-                        split=split).cuda()
+model = FINAL_Model(video_predictor=video_predictor, video_predictor_path=video_predictor_path,
+                    segmentation=segmentation, segmentation_path=segmentation_path,
+                    split=split).cuda()
 model.eval()
 total_params = sum(p.numel() for p in model.parameters())
 print(f"Number of model parameters - {total_params}")
@@ -280,17 +270,28 @@ wandb.init(
         config={"Total samples": 1000,
                 "batch_size": batch_size})
 
+unique_original_objects = []
+
 with torch.no_grad():
     model.eval()
 
     for it, (_, input_images, target_images, gt_mask) in enumerate(dataloader):
         input_images = input_images.cuda()
         target_images = target_images.cuda()
+        input_img_masks = gt_mask[:, :11].cpu()
         gt_mask = gt_mask[:, -1].cuda()
 
         pred_mask, target_mask, pred_image = model(input_images, target_images)
 
-        # print(pred_mask.shape, target_images.shape, gt_mask.shape)
+        # Get the unique objects for this batch and append it.
+        unique_original_objects = unique_original_objects + get_unique_objects(
+            input_img_masks.detach().cpu().numpy())
+        
+        # print(len(unique_original_objects))
+        # print("UNIQUE OBJ :: ")
+        # print(" >>> ", get_unique_objects(
+        #     input_img_masks.detach().cpu().numpy()))
+
         
         # wandb images.
         w_masks, w_pred_img = plot_images(pred_mask.detach().cpu().numpy()[0],
@@ -304,6 +305,10 @@ with torch.no_grad():
             stacked_gt.append(gt_mask.cpu())
 
     stacked_pred = torch.cat(stacked_pred, 0)
+    
+    
+    print("len of unique obj! >> " , len(unique_original_objects))
+    
     print(f"Stacked Pred shape - {stacked_pred.shape}")
     if split != "test" and split != "unlabeled":
         stacked_target = torch.cat(stacked_target, 0)
@@ -314,7 +319,10 @@ with torch.no_grad():
     if split != 'test':
         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
         jaccard_val = jaccard(stacked_pred, stacked_gt)
+        fixed_stacked_pred = apply_heuristics(stacked_pred, unique_original_objects)
+        jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
         print("Jaccard of predicted with gt: ", jaccard_val)
+        print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
         jaccard_val = jaccard(stacked_target, stacked_gt)
         print("Jaccard of original with gt: ", jaccard_val)
         jaccard_gt = jaccard(stacked_gt, stacked_gt)
