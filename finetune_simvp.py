@@ -19,7 +19,7 @@ from our_OpenSTL.openstl.modules import ConvSC
 import torchmetrics
 from train_seg import get_parameters, eval_epoch
 from utils import class_labels, shapes, materials, colors
-
+from losses import FocalLoss
 
 mean = [0.5061, 0.5045, 0.5008]
 std = [0.0571, 0.0567, 0.0614]
@@ -148,9 +148,11 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(sim_vp_model_path))
 
     # Freeze all layers
-    for param in model.parameters():
-        param.requires_grad = False
-
+#     for param in model.parameters():
+#         param.requires_grad = False
+    encoder_params = model.enc.parameters()
+    hidden_params = model.hid.parameters()
+    
     print(f"Number of trainable parameters: {count_parameters(model)}")
     # New decoder
     T, C, H, W = config["in_shape"]
@@ -159,6 +161,7 @@ if __name__ == "__main__":
     model.dec.readout = nn.Conv2d(config["hid_S"], num_classes, kernel_size=1)
     print("SimVP model loaded from {}".format(sim_vp_model_path))
     print(f"Number of trainable parameters: {count_parameters(model)}")
+    decoder_params = model.dec.parameters()
 
     # Replace the final two layers of the model to output segmentation masks
     # model = SimVPSegmentor(config, sim_vp_model_path)
@@ -167,13 +170,19 @@ if __name__ == "__main__":
 
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
-    optimizer = torch.optim.Adam(model.parameters(), lr=params["ft_lr"])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 'min', verbose=True)
+    lr = params["ft_lr"]
+    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2}, 
+                                  {'params': hidden_params, 'lr': lr*1e-2},
+                                 {'params': decoder_params, 'lr': lr}])
+#     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#         optimizer, 'min', verbose=True)
+
     scaler = GradScaler()
 
     # Training loop
     num_epochs = params["ft_num_epochs"]
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs//2, eta_min=1e-7, verbose=True)
+    
     min_val_loss = float('inf')
 
     for epoch in range(num_epochs):
@@ -187,7 +196,7 @@ if __name__ == "__main__":
                 device), output_mask.to(device)
             optimizer.zero_grad()
 
-            with autocast(enabled=False):
+            with autocast(enabled=True):
                 outputs_pred = model(input_images)
 #                 print(outputs_pred.shape, output_mask.shape)
                 B, T, C, H, W = outputs_pred.shape
@@ -206,9 +215,10 @@ if __name__ == "__main__":
         epoch_time = time() - start_time
 
         wandb.log({"train_loss_total": train_loss, "epoch_time": epoch_time})
+        scheduler.step()
 
         # Validation loop
-        if epoch % 3 == 0:
+        if epoch % 1 == 0:
             model.eval()
             eval_loss = 0.0
             stacked_pred = []
@@ -243,18 +253,16 @@ if __name__ == "__main__":
                 wandb.log({"val_loss_total": eval_loss,
                           "jaccard_score": jaccard_score})
 
-                scheduler.step(eval_loss)
-
                 if eval_loss < min_val_loss:
                     min_val_loss = eval_loss
                     torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
-                    ), f'simvp_segmentation_model_{epoch}.pth')
+                    ), f'./checkpoints/ft_simvp_segmentation_model_{epoch}.pth')
                     print(
                         f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
 
     # Save the trained model
     # Access the inner model for saving
     torch.save(model.module.state_dict() if num_gpus >
-               1 else model.state_dict(), 'simvp_segmentation_model.pth')
+               1 else model.state_dict(), './ft_checkpoints/simvp_segmentation_model.pth')
 
     wandb.finish()

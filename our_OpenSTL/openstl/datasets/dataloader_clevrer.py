@@ -48,7 +48,7 @@ class Clevrer(Dataset):
         self.data_path = os.path.join(self.path, split)
 
         self.video_paths = []
-        if use_unlabeled and not self.use_mask:
+        if use_unlabeled:
             up = os.path.join(self.path, "unlabeled")
             self.video_paths = self.video_paths + \
                 [os.path.join(up, v) for v in os.listdir(
