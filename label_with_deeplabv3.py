@@ -83,3 +83,5 @@ with torch.no_grad():
 #             print(f"Masks saved at {mask_path}")
 
 #         break
+
+print("Labelled")
