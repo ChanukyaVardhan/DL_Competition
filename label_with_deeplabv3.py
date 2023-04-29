@@ -18,7 +18,7 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")    # To run on my stupid laptop
+# device = torch.device("cpu")    # To run on my stupid laptop
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -29,7 +29,7 @@ transform = transforms.Compose([
 
 data_dir = params["data_dir"]
 unlabeled_dataset = CLEVRERVideoSeg(
-    data_dir=data_dir, split='hidden', transform=transform)
+    data_dir=data_dir, split='unlabeled', transform=transform)
 
 test_loader = DataLoader(
     unlabeled_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
@@ -80,5 +80,6 @@ with torch.no_grad():
             #         print(f' mask_{t} {class_name}: {label}')
 
             np.save(mask_path, mask_tensor)
+#             print(f"Masks saved at {mask_path}")
 
-        break
+#         break
