@@ -31,8 +31,8 @@ to_pil = transforms.ToPILImage()
 
 
 def unnormalize(img):
-    unnormalized_image = unnormalize_transform(img)
-    pil_image = to_pil(unnormalized_image)
+    # unnormalized_image = unnormalize_transform(img)
+    pil_image = to_pil(img)
 
     return pil_image
 
@@ -109,11 +109,13 @@ if __name__ == "__main__":
 
     # Replace the final two layers of the model to output segmentation masks
     C_hid = model.dec.readout.in_channels
-    # model.dec.dec[3] = ConvSC(
-    #     C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
+    model.dec.dec[3] = ConvSC(
+        C_hid, C_hid, params["spatio_kernel_dec"], upsampling=False)    # FIX: Figure out upsampling from the model?
     model.dec.readout = nn.Sequential(*[nn.Conv2d(C_hid, C_hid * 4, 3, padding="same"),
                                        nn.SiLU(True),
                                        nn.Conv2d(C_hid * 4, num_classes, 1)])
+
+    # model.dec.readout = 
 
     model_params_after = count_parameters(model)
     print("Model parameters after fixing and adding 2 new layers: ", model_params_after)
@@ -187,8 +189,8 @@ if __name__ == "__main__":
                     loss = criterion(outputs_pred_all, output_mask)
                     eval_loss += loss.item()
                     
-                    pred_mask = torch.argmax(outputs_pred, dim=1)
-                    stacked_pred.append(outputs_pred[:, -1, :, :].cpu())
+                    pred_mask = torch.argmax(outputs_pred, dim=2)
+                    stacked_pred.append(pred_mask[:, -1, :, :].cpu())
                     stacked_gt.append(gt_masks[:, -1, :, :].cpu())
 
                     if i % 100 == 0:
