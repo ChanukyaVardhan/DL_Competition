@@ -31,8 +31,7 @@ to_pil = transforms.ToPILImage()
 
 
 def unnormalize(img):
-    unnormalized_image = unnormalize_transform(img)
-    pil_image = to_pil(unnormalized_image)
+    pil_image = to_pil(img)
 
     return pil_image
 
