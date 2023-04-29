@@ -35,6 +35,7 @@ wandb*
 *.ninja
 .ninja_*
 
-# Greened files
+
+# Greene files
 *.out
 *.err
