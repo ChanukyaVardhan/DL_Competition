@@ -14,10 +14,10 @@ lr: 0.001
 batch_size: 8
 val_batch_size: 16
 drop_path: 0
-sched: 'ReduceLROnPlateau'
+sched: 'CosineAnnealingLR'
 val_batch_size: 16
 num_workers: 4
-data_root: /scratch/pj2251/DL/DL_Competition/data/Dataset_Student
+data_root: /vast/snm6477/DL_Finals/Dataset_Student
 distributed: false
 model_path: ./checkpoints/simvp_checkpoint.pth
 
