@@ -349,7 +349,7 @@ with torch.no_grad():
         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
         jaccard_val = jaccard(stacked_pred, stacked_gt)
         fixed_stacked_pred = apply_heuristics(stacked_pred,
-                                               unique_original_objects, 'background')
+                                               unique_original_objects, 'connected_components')
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
         print("Jaccard of predicted with gt: ", jaccard_val)
         print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
