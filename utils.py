@@ -2,9 +2,9 @@ import numpy as np
 import torch
 import random
 
-shapes = ["cube", "sphere", "cylinder"]
-materials = ["metal", "rubber"]
-colors = ["gray", "red", "blue", "green", "brown", "cyan", "purple", "yellow"]
+shapes = ["cube", "sph", "cyl"]
+materials = ["mtl", "rbr"]
+colors = ["gry", "red", "blu", "grn", "brwn", "cyan", "prple", "yllw"]
 
 
 def get_id(the_object):
@@ -33,7 +33,8 @@ def get_class_name(id):
         c_id = id
 
         return f"{shapes[s_id]}_{materials[m_id]}_{colors[c_id]}"
- 
+
+
 def get_class_ids(id):
     if id == 0:
         raise Exception("Background has no class id tuple")
@@ -48,8 +49,8 @@ def get_class_ids(id):
         return s_id, m_id, c_id
 
 
-
 class_labels = {i: get_class_name(i) for i in range(49)}
+
 
 def get_unique_objects(masks):
     B, T, H, W = masks.shape
@@ -59,8 +60,10 @@ def get_unique_objects(masks):
         per_image_unique_objects = np.array([])
         for t in range(T):
             uniq = np.unique(masks[b, t])
-            per_image_unique_objects = np.union1d(per_image_unique_objects, uniq)
-        obj_classes = [get_class_ids(i) for i in per_image_unique_objects if i != 0]
+            per_image_unique_objects = np.union1d(
+                per_image_unique_objects, uniq)
+        obj_classes = [get_class_ids(i)
+                       for i in per_image_unique_objects if i != 0]
         unique_objects.append(obj_classes)
 
     return unique_objects
@@ -70,7 +73,7 @@ def get_unique_objects(masks):
 def apply_heuristics(S, uniq):
     # S: 1000 x H x W
     # uniq: list - 1000 of numpy arrays (uniq objs over 11 frames)
-    random.seed(3) # our team number
+    random.seed(3)  # our team number
     CNT = 0
     better_stack = []
     for i, obj in enumerate(uniq):
@@ -91,9 +94,10 @@ def apply_heuristics(S, uniq):
             CNT += 1
         for k, v in obj_mapping.items():
             S[i][S[i] == k] = v
-        
+
     print("Images that need fixing : ", CNT)
     return S
+
 
 if __name__ == "__main__":
     print(class_labels)

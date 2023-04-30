@@ -1,3 +1,5 @@
+import itertools
+import matplotlib.colors as mcolors
 from collections import OrderedDict
 from PIL import Image
 import os
@@ -16,9 +18,10 @@ import wandb
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from utils import class_labels, get_unique_objects, apply_heuristics
+from sklearn.metrics import confusion_matrix
+
 
 def plot_images(pred_mask, gt_mask, pred_image, image):
-    
 
     return wandb.Image(image, masks={
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
@@ -214,6 +217,40 @@ class FINAL_Model(nn.Module):
         return pred_mask, target_mask, pred_image_unnormalized
 
 
+def compute_confusion_matrix(true, pred, num_classes):
+    # Flatten the tensor and convert to numpy for easier manipulation
+    true = true.view(-1).cpu().numpy()
+    pred = pred.view(-1).cpu().numpy()
+
+    # Compute confusion matrix with sklearn
+    cm = confusion_matrix(true, pred, labels=range(num_classes))
+
+    return cm
+
+
+def plot_confusion_matrix(cm, file_name):
+    plt.figure(figsize=(100, 100))
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+
+    tick_marks = np.arange(len(class_labels))
+    plt.xticks(tick_marks, class_labels, rotation=90)
+    plt.yticks(tick_marks, class_labels)
+
+    fmt = 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.savefig(f'{file_name}.png')
+
+
 split = "val"  # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
 num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
 
@@ -279,17 +316,12 @@ stacked_pred = []  # stacked predicted segmentation of predicted 22nd frame
 stacked_target = []
 stacked_gt = []  # stacked actual segmentation (only if train/val)
 
-# wandb.init(
-#         entity="dl_competition",
-#         config={"Total samples": 1000,
-#                 "batch_size": batch_size})
 
 unique_original_objects = []
 
-save_images = True # set to True to save images
+save_images = True  # set to True to save images
 
-colors = np.random.rand(49, 3)
-import matplotlib.colors as mcolors
+colors = np.random.rand(50, 3)
 # Create a colormap from these colors
 cmap = mcolors.ListedColormap(colors)
 
@@ -297,44 +329,46 @@ with torch.no_grad():
     model.eval()
 
     for it, (_, input_images, target_images, gt_mask) in tqdm(enumerate(dataloader)):
-        input_images = input_images.cuda() #B, T, C, H, W
+        input_images = input_images.cuda()  # B, T, C, H, W
         target_images = target_images.cuda()
         input_img_masks = gt_mask[:, :11].cpu()
         gt_mask = gt_mask[:, -1]
 
-
         if (video_predictor != "ft_simvp"):
-            pred_mask, target_mask, pred_image = model(input_images, target_images)
+            pred_mask, target_mask, pred_image = model(
+                input_images, target_images)
         else:
             pred_mask = model(input_images)
             pred_mask = torch.argmax(pred_mask, dim=2)
-            pred_mask = pred_mask[:,-1, : , :]
+            pred_mask = pred_mask[:, -1, :, :]
 
         if save_images:
             for b in range(pred_mask.shape[0]):
-                hstacked = np.hstack([gt_mask[b].cpu().numpy(), pred_mask[b].cpu().numpy()])
+                vertical_line = np.ones(
+                    (pred_mask.shape[2], 10), dtype=np.uint8)*50
+                hstacked = np.hstack(
+                    [gt_mask[b].cpu().numpy(), vertical_line, pred_mask[b].cpu().numpy()])
                 plt.imsave(f"./images/{it}_{b}.png", hstacked, cmap=cmap)
 
         # print(pred_mask.shape, target_images.shape, gt_mask.shape)
         unique_original_objects = unique_original_objects + get_unique_objects(
             input_img_masks.cpu().numpy())
-        
-        
+
         if (video_predictor != "ft_simvp"):
             # wandb images.
             w_masks, w_pred_img = plot_images(pred_mask.detach().cpu().numpy()[0],
-                        target_mask.detach().cpu().numpy()[0],
-                        pred_image.detach().cpu().numpy()[0].transpose(1, 2, 0),
-                        target_images.detach().cpu().numpy()[0][-1].transpose(1, 2, 0))
-            # wandb.log({"Original image and gt + pred masks": w_masks, "Pred image": w_pred_img})
-        
+                                              target_mask.detach().cpu().numpy()[
+                0],
+                pred_image.detach().cpu().numpy()[
+                0].transpose(1, 2, 0),
+                target_images.detach().cpu().numpy()[0][-1].transpose(1, 2, 0))
+
         stacked_pred.append(pred_mask.cpu())
         if split != "test" and split != "unlabeled":
             if (video_predictor != "ft_simvp"):
                 stacked_target.append(target_mask.cpu())
             stacked_gt.append(gt_mask.cpu())
 
-    
     print("Number of Unique original objects: ", len(unique_original_objects))
     stacked_pred = torch.cat(stacked_pred, 0)
     print(f"Stacked Pred shape - {stacked_pred.shape}")
@@ -348,14 +382,25 @@ with torch.no_grad():
     if split != 'test':
         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
         jaccard_val = jaccard(stacked_pred, stacked_gt)
-        fixed_stacked_pred = apply_heuristics(stacked_pred, unique_original_objects)
+        confusion_mat = compute_confusion_matrix(stacked_gt, stacked_pred, 49)
+        plot_confusion_matrix(confusion_mat, "Predicted Segmentation")
+        fixed_stacked_pred = apply_heuristics(
+            stacked_pred, unique_original_objects)
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
+        confusion_mat = compute_confusion_matrix(
+            stacked_gt, fixed_stacked_pred, 49)
+        plot_confusion_matrix(
+            confusion_mat, "Predicted Segmentation after Heuristics")
         print("Jaccard of predicted with gt: ", jaccard_val)
         print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
         if (video_predictor != "ft_simvp"):
             jaccard_val = jaccard(stacked_target, stacked_gt)
             print("Jaccard of original with gt: ", jaccard_val)
+            confusion_mat = compute_confusion_matrix(
+                stacked_gt, stacked_target, 49)
+            plot_confusion_matrix(confusion_mat, "Target Segmentation")
         jaccard_gt = jaccard(stacked_gt, stacked_gt)
         print("Jaccard of gt with gt: ", jaccard_gt)
-        
-# wandb.finish()
+        confusion_mat = compute_confusion_matrix(
+            stacked_gt, stacked_gt, 49)
+        plot_confusion_matrix(confusion_mat, "Truth")
