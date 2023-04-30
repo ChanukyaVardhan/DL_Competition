@@ -21,6 +21,7 @@ distributed: false
 base_model_path: ./checkpoints/simvp_checkpoint.pth
 resume_checkpoint: ./ft_checkpoints/ft_simvp_segmentation_model_55_0.372.pth
 
+
 # Fine tuning
 num_classes: 49
 ft_lr: 0.001
