@@ -50,6 +50,7 @@ def get_class_ids(id):
 
 
 class_labels = {i: get_class_name(i) for i in range(49)}
+class_labels_list = [get_class_name(i) for i in range(49)]
 
 
 def get_unique_objects(masks):
