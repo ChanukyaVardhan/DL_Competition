@@ -3,8 +3,8 @@
 #SBATCH --job-name=finetune_simvp
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem-per-gpu=32G
-#SBATCH --gres=gpu:3
+#SBATCH --mem=32GB
+#SBATCH --gres=gpu:4
 #SBATCH --time=12:00:00
 
 module purge
