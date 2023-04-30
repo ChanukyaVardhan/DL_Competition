@@ -5,7 +5,6 @@ import random
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
-
 from openstl.datasets.utils import create_loader
 
 
@@ -19,12 +18,10 @@ def get_class_ids(id):
         m_id = id // 8
         id = id % 8
         c_id = id
-
         return s_id, m_id, c_id
 
 
 class Clevrer(Dataset):
-
     def __init__(self, params, transform, split='train', use_unlabeled=False):
         self.path = params['path']
         self.num_frames = params['num_frames']
@@ -37,14 +34,11 @@ class Clevrer(Dataset):
         self.transform = transform
         self.use_mask = params.get('use_mask', False)
         self.split_mask = params.get('split_mask', False)
-
         # FIX : Possibly need to normalize the data.
         self.mean = 0
         self.std = 1
-
         if (split != 'train' and split != 'val'):
             raise ValueError("Split must be either 'train' or 'val'")
-
         self.data_path = os.path.join(self.path, split)
 
         self.video_paths = []
@@ -55,7 +49,6 @@ class Clevrer(Dataset):
                     up) if os.path.isdir(os.path.join(up, v))]
         self.video_paths = self.video_paths + [os.path.join(self.data_path, v) for v in os.listdir(
             self.data_path) if os.path.isdir(os.path.join(self.data_path, v))]
-
         self.video_paths.sort()
         print("Videos before : ", len(self.video_paths))
         # print("***********TRAINING FOR A SINGLE VIDEO LOCALLY!**********")
@@ -68,31 +61,33 @@ class Clevrer(Dataset):
     def _load_image(self, image_path):
         image = Image.open(image_path)
         image = self.transform(image) if self.transform is not None else image
-
         return image
 
     def __getitem__(self, index):
         video_path = self.video_paths[index]
-
         input_frames = [i for i in range(self.num_input_frames)]
-
         output_frames = [i for i in range(
             self.num_input_frames, self.num_input_frames + self.to_predict)]
-
         input_images = []
         for index in input_frames:
             image = self._load_image(os.path.join(
                 video_path, f"image_{index}.png"))
             input_images.append(image)
         input_images = torch.stack(input_images, dim=0)
-
         output_images = []
         for index in output_frames:
             image = self._load_image(os.path.join(
                 video_path, f"image_{index}.png"))
             output_images.append(image)
         output_images = torch.stack(output_images, dim=0)
-
+        if self.use_mask:
+            mask_path = os.path.join(video_path, "mask.npy")
+            mask = torch.FloatTensor(np.load(mask_path)) if os.path.exists(mask_path) else \
+                torch.zeros(self.num_frames, self.img_height, self.img_width)
+            # Set 255 to all mask values greater than 49
+            mask[mask >= 49] = 255
+            output_mask = mask[output_frames]
+            return input_images, output_images, output_mask.long()
         # order: num_frames(0) x img_channel(1) x img_height(2) x img_width(3) : 22 x 3 x 160 x 240
         return input_images, output_images
 
@@ -101,12 +96,10 @@ def load_data(batch_size, val_batch_size,
               params, transform,
               data_root=None, num_workers=4,
               pre_seq_length=10, aft_seq_length=10, distributed=False):
-
     train_set = Clevrer(params=params, transform=transform,
                         split='train', use_unlabeled=True)
     val_set = Clevrer(params=params, transform=transform,
                       split='val', use_unlabeled=False)
-
     # FIX : Looks correct, but look carefully all the parameters of create_loader later.
     dataloader_train = create_loader(train_set,
                                      batch_size=batch_size,
@@ -123,6 +116,5 @@ def load_data(batch_size, val_batch_size,
     #                                 shuffle=False, is_training=False,
     #                                 pin_memory=True, drop_last=True,
     #                                 num_workers=num_workers, distributed=distributed)
-
     # FIX : Change this later maybe.
     return dataloader_train, dataloader_vali, None
