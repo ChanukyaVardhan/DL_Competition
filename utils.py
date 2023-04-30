@@ -66,13 +66,9 @@ def get_unique_objects(masks):
     return unique_objects
 
 
-# Simple heuristic: We are assigning background / known random objects to the unknown objects
-def apply_heuristics(S, uniq):
-    # S: 1000 x H x W
-    # uniq: list - 1000 of numpy arrays (uniq objs over 11 frames)
+def apply_background_heuristic(S, uniq):
     random.seed(3) # our team number
     CNT = 0
-    better_stack = []
     for i, obj in enumerate(uniq):
         msk = S[i].clone()
         msk = msk.detach().cpu().numpy()
@@ -94,6 +90,21 @@ def apply_heuristics(S, uniq):
         
     print("Images that need fixing : ", CNT)
     return S
+
+def apply_connected_components_heuristic(S, uniq):
+    print("Not yet implemented")
+    return S
+
+# Simple heuristic: We are assigning background / known random objects to the unknown objects
+def apply_heuristics(S, uniq, method):
+    # S: 1000 x H x W
+    # uniq: list - 1000 of numpy arrays (uniq objs over 11 frames)
+    if method == "background":
+        return apply_background_heuristic(S, uniq)
+    elif method == "connected_components":
+        return apply_connected_components_heuristic(S, uniq)
+    else :
+        raise Exception("Unknown heuristic method")
 
 if __name__ == "__main__":
     print(class_labels)
