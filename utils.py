@@ -95,18 +95,40 @@ def apply_background_heuristic(S, uniq):
     return S
 
 
-def get_area_and_neighbours(msk, k):
-    return 200, []
+def get_area_and_neighbours(msk, k, known_ids):
+    area = 0
+    H, W = msk.shape
+    neighbours = set()
+    # visited = [[False] * W for _ in range(H)]
 
+    for i in range(H):
+        for j in range(W):
+            if msk[i][j] == k:
+                area += 1
+                if i > 0 and msk[i-1][j] != k and msk[i-1][j] != 0:
+                    neighbours.add(msk[i-1][j])
+                if i < H-1 and msk[i+1][j] != k and msk[i+1][j] != 0:
+                    neighbours.add(msk[i+1][j])
+                if j > 0 and msk[i][j-1] != k and msk[i][j-1] != 0:
+                    neighbours.add(msk[i][j-1])
+                if j < W-1 and msk[i][j+1] != k and msk[i][j+1] != 0:
+                    neighbours.add(msk[i][j+1])
+
+    return area, [n for n in neighbours if n in known_ids]
+
+# FIX : Write a better heuristic. This is just a placeholder
+def get_closest_object(k, known_ids):
+    return 0
 
 def apply_connected_components_heuristic(S, uniq):
     random.seed(3)  # our team number
     bad_cnt = 0
-    area_threshold = 100  # FIX: Change this!
+    area_threshold = 100  # FIX: Tune this!
+    print("Running connected components heuristic with area threshold : ", area_threshold)
     for i, obj in enumerate(uniq):  # Iterating over batch
         msk = S[i].clone()
         msk = msk.detach().cpu().numpy()
-        print("msk shape : ", msk.shape)
+        # print("msk shape : ", msk.shape)
         uniq_msk = np.unique(msk)
         good = True
         known_ids = [int(1 + C + 8*B + 16*A) for (A, B, C) in obj]
@@ -116,17 +138,30 @@ def apply_connected_components_heuristic(S, uniq):
                 continue
             if k not in known_ids:  # Unknown object
                 good = False
-                obj_area, neighbours = get_area_and_neighbours(msk, k)
+                obj_area, neighbours = get_area_and_neighbours(msk, k, known_ids)
                 if obj_area < area_threshold:  # Small object
                     obj_mapping[k] = 0
                     if len(neighbours) > 0:
-                        # FIX: Not a fix, just highlighting.
+                        # Returns the first neighbour (known object)
                         obj_mapping[k] = neighbours[0]
+                else:  # Large object
+                    if len(neighbours) > 0:
+                        # Returns the first neighbour (known object)
+                        obj_mapping[k] = neighbours[0]
+                    else:
+                        obj_mapping[k] = get_closest_object(k, known_ids)
 
             else:
-                obj_area, neightbours = get_area_and_neighbours(msk, k)
+                obj_area, neighbours = get_area_and_neighbours(msk, k, known_ids)
+                if obj_area < area_threshold:  # Small object
+                    # For known objects, we assign small areas background
+                    obj_mapping[k] = 0
+
         if not good:
             bad_cnt += 1
+        for k, v in obj_mapping.items():
+            S[i][S[i] == k] = v
+    
     print("Videos that need fixing : ", bad_cnt)
     return S
 
