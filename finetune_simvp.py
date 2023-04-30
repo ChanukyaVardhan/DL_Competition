@@ -132,6 +132,7 @@ if __name__ == "__main__":
         optimizer, T_max=num_epochs//3, eta_min=1e-7, verbose=True)
 
     min_val_loss = float('inf')
+    min_jaccard = 100
 
     for epoch in range(num_epochs):
         model.train()
@@ -201,12 +202,12 @@ if __name__ == "__main__":
                 wandb.log({"val_loss_total": eval_loss,
                           "jaccard_score": jaccard_score})
 
-                if eval_loss < min_val_loss:
-                    min_val_loss = eval_loss
+                if jaccard_score < min_jaccard:
+                    min_jaccard = jaccard_score
                     torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
-                    ), f'./ft_checkpoints/ft_simvp_segmentation_model_{epoch}.pth')
+                    ), f'./ft_checkpoints/ft_simvp_segmentation_model_{epoch}_{jaccard_score}.pth')
                     print(
-                        f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
+                        f"Model saved at epoch {epoch} with val loss: {min_val_loss}. Jaccard score: {jaccard_score}")
 
     # Save the trained model
     # Access the inner model for saving
