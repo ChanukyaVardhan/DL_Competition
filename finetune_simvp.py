@@ -128,7 +128,7 @@ if __name__ == "__main__":
     # Training loop
     num_epochs = params["ft_num_epochs"]
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=num_epochs//2, eta_min=1e-7, verbose=True)
+        optimizer, T_max=num_epochs//3, eta_min=1e-7, verbose=True)
 
     min_val_loss = float('inf')
 
@@ -203,7 +203,7 @@ if __name__ == "__main__":
                 if eval_loss < min_val_loss:
                     min_val_loss = eval_loss
                     torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
-                    ), f'./checkpoints/ft_simvp_segmentation_model_{epoch}.pth')
+                    ), f'./ft_checkpoints/ft_simvp_segmentation_model_{epoch}.pth')
                     print(
                         f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
 
