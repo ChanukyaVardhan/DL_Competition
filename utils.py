@@ -78,7 +78,7 @@ def apply_heuristics(S, uniq):
         msk = msk.detach().cpu().numpy()
         uniq_msk = np.unique(msk)
         good = True
-        known_ids = [1 + C + 8*B + 16*A for (A, B, C) in obj]
+        known_ids = [int(1 + C + 8*B + 16*A) for (A, B, C) in obj]
         obj_mapping = {}
         for k in uniq_msk:
             if k != 0:
