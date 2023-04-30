@@ -62,14 +62,15 @@ def plot_masks(pred_mask, gt_mask, image, idx):
 if __name__ == "__main__":
     params = get_parameters()
 
-    train_loader, val_loader, test_loader = load_data(
-        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"], use_mask=params["use_mask"], split_mask=params["split_mask"])
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_gpus = torch.cuda.device_count()
     if num_gpus > 1:  # Multiple GPUs
         params["batch_size"] *= num_gpus
         params["num_workers"] *= num_gpus
+        # params["val_batch_size"] *= 2
+
+    train_loader, val_loader, test_loader = load_data(
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], distributed=False, use_mask=params["use_mask"], split_mask=params["split_mask"])
 
     wandb.init(
         entity="dl_competition",
