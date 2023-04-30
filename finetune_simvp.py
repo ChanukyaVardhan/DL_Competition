@@ -114,6 +114,8 @@ if __name__ == "__main__":
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
+    class_weights = torch.ones(num_classes).to(device)
+    class_weights[0] = 0.4
     criterion = nn.CrossEntropyLoss(ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     lr = params["ft_lr"]
