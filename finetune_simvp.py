@@ -187,7 +187,7 @@ if __name__ == "__main__":
                     stacked_pred.append(pred_mask[:, -1, :, :].cpu())
                     stacked_gt.append(gt_masks[:, -1, :, :].cpu())
 
-                    if i % 100 == 0:
+                    if i % 10 == 0:
                         mask = plot_masks(pred_mask[0][-1].cpu().numpy(
                         ), gt_masks[0][-1].cpu().numpy(), output[0][-1], i)
                         wandb.log({"val_predictions": mask})
