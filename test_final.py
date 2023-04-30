@@ -17,7 +17,7 @@ import torchmetrics
 import wandb
 from tqdm import tqdm
 from matplotlib import pyplot as plt
-from utils import class_labels, get_unique_objects, apply_heuristics
+from utils import class_labels, get_unique_objects, apply_heuristics, class_labels_list
 from sklearn.metrics import confusion_matrix
 
 
@@ -233,14 +233,14 @@ def compute_confusion_matrix(true, pred, num_classes):
 
 
 def plot_confusion_matrix(cm, file_name):
-    plt.figure(figsize=(100, 100))
+    plt.figure(figsize=(20, 20))
     plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
     plt.title('Confusion matrix')
     plt.colorbar()
-
-    tick_marks = np.arange(len(class_labels))
-    plt.xticks(tick_marks, class_labels, rotation=90)
-    plt.yticks(tick_marks, class_labels)
+    
+    tick_marks = np.arange(len(class_labels_list))
+    plt.xticks(tick_marks, class_labels_list, rotation=90)
+    plt.yticks(tick_marks, class_labels_list)
 
     fmt = 'd'
     thresh = cm.max() / 2.
@@ -258,7 +258,7 @@ def plot_confusion_matrix(cm, file_name):
 split = "val"  # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
 num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
 
-data_dir = "/scratch/pj2251/DL/DL_Competition/data/Dataset_Student"
+data_dir = "/vast/snm6477/DL_Finals/Dataset_Student/"
 
 # video_predictor = "convttlstm"
 # video_predictor_path = "./checkpoints/convttlstm_best.pt"
@@ -347,7 +347,7 @@ with torch.no_grad():
         if save_images:
             for b in range(pred_mask.shape[0]):
                 vertical_line = np.ones(
-                    (pred_mask.shape[2], 10), dtype=np.uint8)*50
+                    (pred_mask.shape[1], 10), dtype=np.uint8)*50
                 hstacked = np.hstack(
                     [gt_mask[b].cpu().numpy(), vertical_line, pred_mask[b].cpu().numpy()])
                 plt.imsave(f"./images/{it}_{b}.png", hstacked, cmap=cmap)
