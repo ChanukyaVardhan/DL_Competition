@@ -136,7 +136,7 @@ if __name__ == "__main__":
         optimizer, T_max=num_epochs//3, eta_min=1e-7, verbose=True)
 
     min_val_loss = float('inf')
-    min_jaccard = 100
+    max_jaccard = 0.0
 
     for epoch in range(num_epochs):
         model.train()
@@ -206,8 +206,8 @@ if __name__ == "__main__":
                 wandb.log({"val_loss_total": eval_loss,
                           "jaccard_score": jaccard_score})
 
-                if jaccard_score < min_jaccard:
-                    min_jaccard = jaccard_score
+                if jaccard_score > max_jaccard:
+                    max_jaccard = jaccard_score
                     torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
                     ), f'./ft_checkpoints/ft_simvp_segmentation_model_{epoch}_{jaccard_score}.pth')
                     print(
