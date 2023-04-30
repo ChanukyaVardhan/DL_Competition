@@ -19,7 +19,8 @@ val_batch_size: 16
 num_workers: 4
 data_root: /vast/snm6477/DL_Finals/Dataset_Student
 distributed: false
-model_path: ./checkpoints/simvp_checkpoint.pth
+base_model_path: ./checkpoints/simvp_checkpoint.pth
+resume_checkpoint: ./checkpoints/ft_simvp_segmentation_model_20.pth
 
 # Fine tuning
 num_classes: 49

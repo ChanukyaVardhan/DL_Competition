@@ -88,15 +88,13 @@ if __name__ == "__main__":
         "num_classes": params["num_classes"],
     }
     # exp = BaseExperiment(args)
-    sim_vp_model_path = params["model_path"]
+    sim_vp_model_path = params["base_model_path"]
     num_classes = params["num_classes"]
 
     model = SimVP_Model(**config)
-    model.load_state_dict(torch.load(sim_vp_model_path))
+    # model.load_state_dict(torch.load(sim_vp_model_path))
+    # print("SimVP model loaded from {}".format(sim_vp_model_path))
 
-    # Freeze all layers
-#     for param in model.parameters():
-#         param.requires_grad = False
     encoder_params = model.enc.parameters()
     hidden_params = model.hid.parameters()
 
@@ -106,8 +104,11 @@ if __name__ == "__main__":
     model.dec = Decoder(config["hid_S"], C,
                         config["N_S"], config["spatio_kernel_dec"])
     model.dec.readout = nn.Conv2d(config["hid_S"], num_classes, kernel_size=1)
-    print("SimVP model loaded from {}".format(sim_vp_model_path))
     print(f"Number of trainable parameters: {count_parameters(model)}")
+    resume_checkpoint = params["resume_checkpoint"]
+    model.load_state_dict(torch.load(resume_checkpoint))
+    print("SimVP model resumed from {}".format(sim_vp_model_path))
+
     decoder_params = model.dec.parameters()
 
     # Replace the final two layers of the model to output segmentation masks
@@ -115,7 +116,10 @@ if __name__ == "__main__":
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
-    criterion = nn.CrossEntropyLoss(ignore_index=255)  # For segmentation tasks
+    class_weights = torch.ones(params["num_classes"]).to(device)
+    class_weights[0] = 0.6
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights, ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     lr = params["ft_lr"]
     optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2},
