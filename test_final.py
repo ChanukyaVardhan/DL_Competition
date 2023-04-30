@@ -40,6 +40,10 @@ simvp_config = {
     "num_classes": 49,
 }
 
+save_images = True  # set to True to save images
+if save_images:
+    os.makedirs(f"./images/", exist_ok=True)
+
 
 class TEST_Dataset(Dataset):
     def __init__(self, data_dir="./data", num_samples=0, transform=None, split='test'):
@@ -248,7 +252,7 @@ def plot_confusion_matrix(cm, file_name):
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
-    plt.savefig(f'{file_name}.png')
+    plt.savefig(f'./images/{file_name}.png')
 
 
 split = "val"  # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
@@ -318,8 +322,6 @@ stacked_gt = []  # stacked actual segmentation (only if train/val)
 
 
 unique_original_objects = []
-
-save_images = True  # set to True to save images
 
 colors = np.random.rand(50, 3)
 # Create a colormap from these colors
