@@ -57,136 +57,138 @@ def get_parameters():
     return params
 
 
-params = get_parameters()
+if __name__ == "__main__":
 
-# Set seed
-torch.manual_seed(params["seed"])
-torch.cuda.manual_seed_all(params["seed"])
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
+    params = get_parameters()
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-num_gpus = torch.cuda.device_count()
-if num_gpus > 1:  # Multiple GPUs
-    params["batch_size"] *= num_gpus
-    params["num_workers"] *= num_gpus
+    # Set seed
+    torch.manual_seed(params["seed"])
+    torch.cuda.manual_seed_all(params["seed"])
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
-wandb.init(
-    entity="dl_competition",
-    config=params,
-)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    num_gpus = torch.cuda.device_count()
+    if num_gpus > 1:  # Multiple GPUs
+        params["batch_size"] *= num_gpus
+        params["num_workers"] *= num_gpus
 
-# Prepare the dataset
-# Set the appropriate arguments for your dataset class
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
-    # transforms.RandomRotation(30),
-    transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
-        0.0571, 0.0567, 0.0614])
-])
-transform_mask = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
-    # transforms.RandomRotation(30)
-])
-data_dir = params["data_dir"]
-train_dataset = CLEVRERSegDataset(
-    data_dir=data_dir, split='train', user_transforms=transform, mask_transform=transform_mask)
-val_dataset = CLEVRERSegDataset(
-    data_dir=data_dir, split='val', user_transforms=transform, mask_transform=transform_mask, num_samples=1000)
+    wandb.init(
+        entity="dl_competition",
+        config=params,
+    )
 
-train_loader = DataLoader(
-    train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
-val_loader = DataLoader(
-    val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
+    # Prepare the dataset
+    # Set the appropriate arguments for your dataset class
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        # transforms.RandomRotation(30),
+        transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
+            0.0571, 0.0567, 0.0614])
+    ])
+    transform_mask = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        # transforms.RandomRotation(30)
+    ])
+    data_dir = params["data_dir"]
+    train_dataset = CLEVRERSegDataset(
+        data_dir=data_dir, split='train', user_transforms=transform, mask_transform=transform_mask)
+    val_dataset = CLEVRERSegDataset(
+        data_dir=data_dir, split='val', user_transforms=transform, mask_transform=transform_mask, num_samples=1000)
 
-# Create the model
-model = deeplabv3_resnet50(
-    num_classes=params["num_classes"], weights_backbone=None)
-model = nn.DataParallel(model).to(device) if num_gpus > 1 else model.to(device)
+    train_loader = DataLoader(
+        train_dataset, batch_size=params["batch_size"], shuffle=True, num_workers=params["num_workers"])
+    val_loader = DataLoader(
+        val_dataset, batch_size=params["batch_size"], shuffle=False, num_workers=params["num_workers"])
 
-# Print number of parameters
-print(f"Number of parameters: {count_parameters(model)}")
-model.to(device)
+    # Create the model
+    model = deeplabv3_resnet50(
+        num_classes=params["num_classes"], weights_backbone=None)
+    model = nn.DataParallel(model).to(
+        device) if num_gpus > 1 else model.to(device)
 
-# Set up the loss function and optimizer
-criterion = nn.CrossEntropyLoss(ignore_index=255)
-optimizer = optim.Adam(
-    model.parameters(), lr=float(params['lr']), weight_decay=float(params['weight_decay']))
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, 'min', factor=0.5, verbose=True, min_lr=1e-6)
+    # Print number of parameters
+    print(f"Number of parameters: {count_parameters(model)}")
+    model.to(device)
 
-# Training loop
-num_epochs = int(params["num_epochs"])
-min_val_loss = float('inf')
-for epoch in range(num_epochs):
-    model.train()
-    train_loss = 0.0
-    for images, masks in train_loader:
-        images, masks = images.to(device), masks.to(device)
+    # Set up the loss function and optimizer
+    criterion = nn.CrossEntropyLoss(ignore_index=255)
+    optimizer = optim.Adam(
+        model.parameters(), lr=float(params['lr']), weight_decay=float(params['weight_decay']))
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 'min', factor=0.5, verbose=True, min_lr=1e-6)
 
-        optimizer.zero_grad()
+    # Training loop
+    num_epochs = int(params["num_epochs"])
+    min_val_loss = float('inf')
+    for epoch in range(num_epochs):
+        model.train()
+        train_loss = 0.0
+        for images, masks in train_loader:
+            images, masks = images.to(device), masks.to(device)
 
-        outputs = model(images)['out']
-        loss = criterion(outputs, masks)
-        train_loss += loss.item()
-        loss.backward()
+            optimizer.zero_grad()
 
-        optimizer.step()
+            outputs = model(images)['out']
+            loss = criterion(outputs, masks)
+            train_loss += loss.item()
+            loss.backward()
 
-    train_loss /= len(train_loader)
-    wandb.log({"train_loss": train_loss})
+            optimizer.step()
 
-    # Validation loop
-    if epoch % 5 == 0:
-        model.eval()
-        eval_loss = 0
-        stacked_pred = []
-        stacked_gt = []
-        jaccard = torchmetrics.JaccardIndex(
-            task="multiclass", num_classes=params["num_classes"])
-        with torch.no_grad():
-            for i, (images, masks) in enumerate(val_loader):
-                images, gt_mask = images.to(device), masks.to(device)
+        train_loss /= len(train_loader)
+        wandb.log({"train_loss": train_loss})
 
-                outputs = model(images)['out']
-                loss = criterion(outputs, gt_mask)
-                eval_loss += loss.item()
+        # Validation loop
+        if epoch % 5 == 0:
+            model.eval()
+            eval_loss = 0
+            stacked_pred = []
+            stacked_gt = []
+            jaccard = torchmetrics.JaccardIndex(
+                task="multiclass", num_classes=params["num_classes"])
+            with torch.no_grad():
+                for i, (images, masks) in enumerate(val_loader):
+                    images, gt_mask = images.to(device), masks.to(device)
 
-                # Calculate the validation metrics
-                pred_mask = torch.argmax(outputs, dim=1)
-                stacked_pred.append(pred_mask.cpu())
-                stacked_gt.append(gt_mask.cpu())
+                    outputs = model(images)['out']
+                    loss = criterion(outputs, gt_mask)
+                    eval_loss += loss.item()
 
-                if i % 100 == 0:
-                    mask = plot_masks(pred_mask[0].cpu().numpy(
-                    ), gt_mask[0].cpu().numpy(), images[0].cpu(), i)
-                    wandb.log({"val_predictions": mask})
+                    # Calculate the validation metrics
+                    pred_mask = torch.argmax(outputs, dim=1)
+                    stacked_pred.append(pred_mask.cpu())
+                    stacked_gt.append(gt_mask.cpu())
 
-        stacked_pred = torch.cat(stacked_pred, 0)
-        stacked_gt = torch.cat(stacked_gt, 0)
-        jaccard_score = jaccard(stacked_pred, stacked_gt)
-        wandb.log({"jaccard_score": jaccard_score})
+                    if i % 100 == 0:
+                        mask = plot_masks(pred_mask[0].cpu().numpy(
+                        ), gt_mask[0].cpu().numpy(), images[0].cpu(), i)
+                        wandb.log({"val_predictions": mask})
 
-        eval_loss /= len(val_loader)
-        wandb.log({"val_loss": eval_loss})
+            stacked_pred = torch.cat(stacked_pred, 0)
+            stacked_gt = torch.cat(stacked_gt, 0)
+            jaccard_score = jaccard(stacked_pred, stacked_gt)
+            wandb.log({"jaccard_score": jaccard_score})
 
-        scheduler.step(eval_loss)
+            eval_loss /= len(val_loader)
+            wandb.log({"val_loss": eval_loss})
 
-        # Save the best evaluation loss model
-        if eval_loss < min_val_loss:
-            min_val_loss = eval_loss
-            # FIX: model.module
-            torch.save(model.state_dict(),
-                       f'deeplab_v3_segmentation_model_{epoch}.pth')
+            scheduler.step(eval_loss)
 
+            # Save the best evaluation loss model
+            if eval_loss < min_val_loss:
+                min_val_loss = eval_loss
+                # FIX: model.module
+                torch.save(model.state_dict(),
+                           f'deeplab_v3_segmentation_model_{epoch}.pth')
 
-# Save the trained model
-# Access the inner model for saving
+    # Save the trained model
+    # Access the inner model for saving
 
-# FIX: model.module
-torch.save(model.state_dict(), 'deeplab_v3_segmentation_model.pth')
+    # FIX: model.module
+    torch.save(model.state_dict(), 'deeplab_v3_segmentation_model.pth')
 
-wandb.finish()
+    wandb.finish()
