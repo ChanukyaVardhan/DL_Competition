@@ -238,6 +238,17 @@ def plot_confusion_matrix(cm, file_name):
     plt.title('Confusion matrix')
     plt.colorbar()
     
+    threshold = 1000
+    np.fill_diagonal(cm, 0)
+    error_pairs = np.argwhere(cm > threshold)
+    errors = confusion_mat[error_pairs[:, 0], error_pairs[:, 1]]
+    sorted_indices = np.argsort(errors)[::-1]
+
+    for idx in sorted_indices:
+        pair = error_pairs[idx]
+        if pair[0]!=pair[1]:
+            print(f"Truth: {class_labels_list[pair[0]]}, Predicted: {class_labels_list[pair[1]]}, Errors: {errors[idx]}")
+    
     tick_marks = np.arange(len(class_labels_list))
     plt.xticks(tick_marks, class_labels_list, rotation=90)
     plt.yticks(tick_marks, class_labels_list)
@@ -292,7 +303,7 @@ else:
 dataset = TEST_Dataset(
     data_dir=data_dir, num_samples=num_samples, transform=transform, split=split)
 
-batch_size = 16
+batch_size = 32
 dataloader = torch.utils.data.DataLoader(
     dataset, batch_size=batch_size, drop_last=False, num_workers=4, shuffle=False)
 
