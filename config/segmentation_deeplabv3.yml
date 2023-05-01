@@ -1,11 +1,11 @@
 # model
 checkpoint_path:    "checkpoints"   # Model checkpoint path
 is_pretrain:        True            # Falg to decide pretraining
-test_checkpoint:    "./checkpoints/segmentation_deeplabv3.pt"
+test_checkpoint:    "./checkpoints/deeplab_v3_segmentation_model_50.pth"
 
 
 # data
-data_dir:           "/scratch/pj2251/DL/DL_Competition/data/Dataset_Student"        # Data directory
+data_dir:           "/vast/snm6477/DL_Finals/Dataset_Student"        # Data directory
 batch_size:         64               # Batch size
 num_workers:        4               # Number of workers for data loader
 num_classes:        49
