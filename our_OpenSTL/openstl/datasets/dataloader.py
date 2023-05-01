@@ -25,6 +25,7 @@ def load_data(dataname, batch_size, val_batch_size, num_workers, data_root, dist
         params['num_frames'] = 22
         params['use_mask'] = kwargs.get('use_mask', False)
         params['split_mask'] = kwargs.get('split_mask', False)
+        params['clean_videos'] = kwargs.get('clean_videos', None)
         transform = transforms.ToTensor()
         return load_data(batch_size, val_batch_size, params, transform, data_root, num_workers,
                          pre_seq_length, aft_seq_length, distributed=distributed)  # FIX : Change the loader.

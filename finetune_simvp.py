@@ -70,7 +70,8 @@ if __name__ == "__main__":
         # params["val_batch_size"] *= 2
 
     train_loader, val_loader, test_loader = load_data(
-        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], distributed=False, use_mask=params["use_mask"], split_mask=params["split_mask"])
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], distributed=False,
+        use_mask=params["use_mask"], split_mask=params["split_mask"], clean_videos=params["clean_videos"])
 
     wandb.init(
         entity="dl_competition",

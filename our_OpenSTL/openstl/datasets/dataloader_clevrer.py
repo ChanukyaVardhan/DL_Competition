@@ -34,6 +34,8 @@ class Clevrer(Dataset):
         self.transform = transform
         self.use_mask = params.get('use_mask', False)
         self.split_mask = params.get('split_mask', False)
+        clean_videos = params.get('clean_videos', None)
+
         # FIX : Possibly need to normalize the data.
         self.mean = 0
         self.std = 1
@@ -42,13 +44,17 @@ class Clevrer(Dataset):
         self.data_path = os.path.join(self.path, split)
 
         self.video_paths = []
-        if use_unlabeled:
+        if clean_videos is not None:
+            with open(clean_videos, 'r') as f:
+                clean_videos = [l.rstrip() for l in f.readlines()]
+            self.video_paths = clean_videos
+        elif use_unlabeled:
             up = os.path.join(self.path, "unlabeled")
             self.video_paths = self.video_paths + \
                 [os.path.join(up, v) for v in os.listdir(
                     up) if os.path.isdir(os.path.join(up, v))]
-        self.video_paths = self.video_paths + [os.path.join(self.data_path, v) for v in os.listdir(
-            self.data_path) if os.path.isdir(os.path.join(self.data_path, v))]
+            self.video_paths = self.video_paths + [os.path.join(self.data_path, v) for v in os.listdir(
+                self.data_path) if os.path.isdir(os.path.join(self.data_path, v))]
         self.video_paths.sort()
         print("Videos before : ", len(self.video_paths))
         # print("***********TRAINING FOR A SINGLE VIDEO LOCALLY!**********")
@@ -82,12 +88,12 @@ class Clevrer(Dataset):
         output_images = torch.stack(output_images, dim=0)
         if self.use_mask:
             mask_path = os.path.join(video_path, "mask.npy")
-            mask = torch.FloatTensor(np.load(mask_path)) if os.path.exists(mask_path) else \
+            mask = torch.LongTensor(np.load(mask_path)) if os.path.exists(mask_path) else \
                 torch.zeros(self.num_frames, self.img_height, self.img_width)
             # Set 255 to all mask values greater than 49
             mask[mask >= 49] = 255
             output_mask = mask[output_frames]
-            return input_images, output_images, output_mask.long()
+            return input_images, output_images, output_mask
         # order: num_frames(0) x img_channel(1) x img_height(2) x img_width(3) : 22 x 3 x 160 x 240
         return input_images, output_images
 
