@@ -45,9 +45,13 @@ class Clevrer(Dataset):
 
         self.video_paths = []
         if clean_videos is not None:
-            with open(clean_videos, 'r') as f:
-                clean_videos = [l.rstrip() for l in f.readlines()]
-            self.video_paths = clean_videos
+            if split == 'train':
+                with open(clean_videos, 'r') as f:
+                    clean_videos = [l.rstrip() for l in f.readlines()]
+                self.video_paths = clean_videos
+            elif split == 'val':
+                self.video_paths = [os.path.join(self.data_path, v) for v in os.listdir(
+                    self.data_path) if os.path.isdir(os.path.join(self.data_path, v))]
         elif use_unlabeled:
             up = os.path.join(self.path, "unlabeled")
             self.video_paths = self.video_paths + \

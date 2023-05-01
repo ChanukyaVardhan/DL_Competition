@@ -123,8 +123,8 @@ if __name__ == "__main__":
         weight=class_weights, ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     lr = params["ft_lr"]
-    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2},
-                                  {'params': hidden_params, 'lr': lr*1e-2},
+    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr},
+                                  {'params': hidden_params, 'lr': lr},
                                  {'params': decoder_params, 'lr': lr}])
 #     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #         optimizer, 'min', verbose=True)
