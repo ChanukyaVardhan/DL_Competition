@@ -68,6 +68,9 @@ def get_unique_objects(masks):
 
     return unique_objects
 
+# Same as above but returns an in in range [0, 48]
+def get_unique_objects_id(masks):
+    return np.unique(masks).tolist()
 
 def apply_background_heuristic(S, uniq):
     random.seed(3)  # our team number
