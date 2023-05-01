@@ -2,9 +2,9 @@ import numpy as np
 import torch
 import random
 
-shapes = ["cube", "sphere", "cylinder"]
-materials = ["metal", "rubber"]
-colors = ["gray", "red", "blue", "green", "brown", "cyan", "purple", "yellow"]
+shapes = ["cube", "sph", "cyl"]
+materials = ["mtl", "rbr"]
+colors = ["gry", "red", "blu", "grn", "brwn", "cyan", "prple", "yllw"]
 
 
 def get_id(the_object):
@@ -50,6 +50,7 @@ def get_class_ids(id):
 
 
 class_labels = {i: get_class_name(i) for i in range(49)}
+class_labels_list = [get_class_name(i) for i in range(49)]
 
 
 def get_unique_objects(masks):
@@ -69,8 +70,11 @@ def get_unique_objects(masks):
     return unique_objects
 
 # Same as above but returns an in in range [0, 48]
+
+
 def get_unique_objects_id(masks):
     return np.unique(masks).tolist()
+
 
 def apply_background_heuristic(S, uniq):
     random.seed(3)  # our team number

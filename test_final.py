@@ -1,3 +1,4 @@
+import itertools
 import matplotlib.colors as mcolors
 from collections import OrderedDict
 from PIL import Image
@@ -13,7 +14,8 @@ from segmentation import SegNeXT
 import torchmetrics
 from tqdm import tqdm
 from matplotlib import pyplot as plt
-from utils import class_labels, get_unique_objects, apply_heuristics
+from utils import class_labels, get_unique_objects, apply_heuristics, class_labels_list
+from sklearn.metrics import confusion_matrix
 
 
 def plot_images(pred_mask, gt_mask, pred_image, image):
@@ -34,6 +36,10 @@ simvp_config = {
     "spatio_kernel_dec": 3,
     "num_classes": 49,
 }
+
+save_images = True  # set to True to save images
+if save_images:
+    os.makedirs(f"./images/", exist_ok=True)
 
 
 class TEST_Dataset(Dataset):
@@ -213,10 +219,56 @@ class FINAL_Model(nn.Module):
         return pred_mask, target_mask, pred_image_unnormalized
 
 
+def compute_confusion_matrix(true, pred, num_classes):
+    # Flatten the tensor and convert to numpy for easier manipulation
+    true = true.view(-1).cpu().numpy()
+    pred = pred.view(-1).cpu().numpy()
+
+    # Compute confusion matrix with sklearn
+    cm = confusion_matrix(true, pred, labels=range(num_classes))
+
+    return cm
+
+
+def plot_confusion_matrix(cm, file_name):
+    plt.figure(figsize=(20, 20))
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+
+    threshold = 1000
+    np.fill_diagonal(cm, 0)
+    error_pairs = np.argwhere(cm > threshold)
+    errors = confusion_mat[error_pairs[:, 0], error_pairs[:, 1]]
+    sorted_indices = np.argsort(errors)[::-1]
+
+    for idx in sorted_indices:
+        pair = error_pairs[idx]
+        if pair[0] != pair[1]:
+            print(
+                f"Truth: {class_labels_list[pair[0]]}, Predicted: {class_labels_list[pair[1]]}, Errors: {errors[idx]}")
+
+    tick_marks = np.arange(len(class_labels_list))
+    plt.xticks(tick_marks, class_labels_list, rotation=90)
+    plt.yticks(tick_marks, class_labels_list)
+
+    fmt = 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.savefig(f'./images/{file_name}.png')
+
+
 split = "val"  # WE CAN CHANGE TO TRAIN/VAL/UNLABELED AS WELL
 num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
 
-data_dir = "/scratch/pj2251/DL/DL_Competition/data/Dataset_Student"
+data_dir = "/vast/snm6477/DL_Finals/Dataset_Student/"
 
 # video_predictor = "convttlstm"
 # video_predictor_path = "./checkpoints/convttlstm_best.pt"
@@ -250,7 +302,7 @@ else:
 dataset = TEST_Dataset(
     data_dir=data_dir, num_samples=num_samples, transform=transform, split=split)
 
-batch_size = 16
+batch_size = 32
 dataloader = torch.utils.data.DataLoader(
     dataset, batch_size=batch_size, drop_last=False, num_workers=4, shuffle=False)
 
@@ -305,8 +357,10 @@ with torch.no_grad():
 
         if save_images:
             for b in range(pred_mask.shape[0]):
+                vertical_line = np.ones(
+                    (pred_mask.shape[1], 10), dtype=np.uint8)*50
                 hstacked = np.hstack(
-                    [gt_mask[b].cpu().numpy(), pred_mask[b].cpu().numpy()])
+                    [gt_mask[b].cpu().numpy(), vertical_line, pred_mask[b].cpu().numpy()])
                 plt.imsave(f"./images/{it}_{b}.png", hstacked, cmap=cmap)
 
         # print(pred_mask.shape, target_images.shape, gt_mask.shape)
@@ -321,7 +375,6 @@ with torch.no_grad():
                 pred_image.detach().cpu().numpy()[
                 0].transpose(1, 2, 0),
                 target_images.detach().cpu().numpy()[0][-1].transpose(1, 2, 0))
-            # wandb.log({"Original image and gt + pred masks": w_masks, "Pred image": w_pred_img})
 
         stacked_pred.append(pred_mask.cpu())
         if split != "test" and split != "unlabeled":
@@ -342,14 +395,28 @@ with torch.no_grad():
     if split != 'test':
         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
         jaccard_val = jaccard(stacked_pred, stacked_gt)
+        confusion_mat = compute_confusion_matrix(stacked_gt, stacked_pred, 49)
+        plot_confusion_matrix(confusion_mat, "Predicted Segmentation")
         torch.save(stacked_pred, "stacked_pred_no_h.pt")
+
         fixed_stacked_pred = apply_heuristics(stacked_pred,
                                               unique_original_objects, 'connected_components')
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
+        confusion_mat = compute_confusion_matrix(
+            stacked_gt, fixed_stacked_pred, 49)
+        plot_confusion_matrix(
+            confusion_mat, "Predicted Segmentation after Heuristics")
         print("Jaccard of predicted with gt: ", jaccard_val)
         print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
+
         if (video_predictor != "ft_simvp"):
             jaccard_val = jaccard(stacked_target, stacked_gt)
             print("Jaccard of original with gt: ", jaccard_val)
+            confusion_mat = compute_confusion_matrix(
+                stacked_gt, stacked_target, 49)
+            plot_confusion_matrix(confusion_mat, "Target Segmentation")
         jaccard_gt = jaccard(stacked_gt, stacked_gt)
         print("Jaccard of gt with gt: ", jaccard_gt)
+        confusion_mat = compute_confusion_matrix(
+            stacked_gt, stacked_gt, 49)
+        plot_confusion_matrix(confusion_mat, "Truth")
