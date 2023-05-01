@@ -3,8 +3,6 @@ import matplotlib.colors as mcolors
 from collections import OrderedDict
 from PIL import Image
 import os
-import glob
-import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,7 +12,6 @@ from convttlstm.utils.convlstmnet import ConvLSTMNet
 from our_OpenSTL.openstl.models import SimVP_Model, Decoder
 from segmentation import SegNeXT
 import torchmetrics
-import wandb
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from utils import class_labels, get_unique_objects, apply_heuristics, class_labels_list
@@ -82,10 +79,11 @@ class TEST_Dataset(Dataset):
     def __getitem__(self, index):
         video_path = self.video_paths[index]
 
-        if self.split == "test":  # LOAD THE 11 FRAMES, AND RETURN 0's FOR OTHERS
+        if self.split == "hidden":  # LOAD THE 11 FRAMES, AND RETURN 0's FOR OTHERS
             frames = range(0, 11)
             target_images = torch.zeros(11, 3, 160, 240)
-            gt_mask = torch.zeros(11, 160, 240)
+            gt_mask = torch.tensor(
+                np.load(os.path.join(video_path, "mask.npy")))
         elif self.split == "train" or self.split == "val":  # LOAD ALL FRAMES AND THE MASK
             frames = range(0, 11)
             target_frames = range(11, 22)
@@ -97,7 +95,7 @@ class TEST_Dataset(Dataset):
             gt_mask = torch.zeros(11, 160, 240)
 
         input_images = self._load_images(video_path, frames)
-        if self.split != "test":
+        if self.split != "hidden":
             target_images = self._load_images(video_path, target_frames)
 
         _, video_name = os.path.split(video_path)
@@ -237,7 +235,7 @@ def plot_confusion_matrix(cm, file_name):
     plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
     plt.title('Confusion matrix')
     plt.colorbar()
-    
+
     threshold = 1000
     np.fill_diagonal(cm, 0)
     error_pairs = np.argwhere(cm > threshold)
@@ -246,9 +244,10 @@ def plot_confusion_matrix(cm, file_name):
 
     for idx in sorted_indices:
         pair = error_pairs[idx]
-        if pair[0]!=pair[1]:
-            print(f"Truth: {class_labels_list[pair[0]]}, Predicted: {class_labels_list[pair[1]]}, Errors: {errors[idx]}")
-    
+        if pair[0] != pair[1]:
+            print(
+                f"Truth: {class_labels_list[pair[0]]}, Predicted: {class_labels_list[pair[1]]}, Errors: {errors[idx]}")
+
     tick_marks = np.arange(len(class_labels_list))
     plt.xticks(tick_marks, class_labels_list, rotation=90)
     plt.yticks(tick_marks, class_labels_list)
@@ -331,10 +330,11 @@ stacked_pred = []  # stacked predicted segmentation of predicted 22nd frame
 stacked_target = []
 stacked_gt = []  # stacked actual segmentation (only if train/val)
 
-
 unique_original_objects = []
 
-colors = np.random.rand(50, 3)
+save_images = True  # set to True to save images
+
+colors = np.random.rand(49, 3)
 # Create a colormap from these colors
 cmap = mcolors.ListedColormap(colors)
 
@@ -397,8 +397,10 @@ with torch.no_grad():
         jaccard_val = jaccard(stacked_pred, stacked_gt)
         confusion_mat = compute_confusion_matrix(stacked_gt, stacked_pred, 49)
         plot_confusion_matrix(confusion_mat, "Predicted Segmentation")
-        fixed_stacked_pred = apply_heuristics(
-            stacked_pred, unique_original_objects)
+        torch.save(stacked_pred, "stacked_pred_no_h.pt")
+
+        fixed_stacked_pred = apply_heuristics(stacked_pred,
+                                              unique_original_objects, 'connected_components')
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
         confusion_mat = compute_confusion_matrix(
             stacked_gt, fixed_stacked_pred, 49)
@@ -406,6 +408,7 @@ with torch.no_grad():
             confusion_mat, "Predicted Segmentation after Heuristics")
         print("Jaccard of predicted with gt: ", jaccard_val)
         print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
+
         if (video_predictor != "ft_simvp"):
             jaccard_val = jaccard(stacked_target, stacked_gt)
             print("Jaccard of original with gt: ", jaccard_val)

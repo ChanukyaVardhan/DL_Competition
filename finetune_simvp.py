@@ -62,14 +62,16 @@ def plot_masks(pred_mask, gt_mask, image, idx):
 if __name__ == "__main__":
     params = get_parameters()
 
-    train_loader, val_loader, test_loader = load_data(
-        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], params["distributed"], use_mask=params["use_mask"], split_mask=params["split_mask"])
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_gpus = torch.cuda.device_count()
     if num_gpus > 1:  # Multiple GPUs
         params["batch_size"] *= num_gpus
         params["num_workers"] *= num_gpus
+        # params["val_batch_size"] *= 2
+
+    train_loader, val_loader, test_loader = load_data(
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], distributed=False,
+        use_mask=params["use_mask"], split_mask=params["split_mask"], clean_videos=params["clean_videos"])
 
     wandb.init(
         entity="dl_competition",
@@ -87,15 +89,13 @@ if __name__ == "__main__":
         "num_classes": params["num_classes"],
     }
     # exp = BaseExperiment(args)
-    sim_vp_model_path = params["model_path"]
+    sim_vp_model_path = params["base_model_path"]
     num_classes = params["num_classes"]
 
     model = SimVP_Model(**config)
-    model.load_state_dict(torch.load(sim_vp_model_path))
+    # model.load_state_dict(torch.load(sim_vp_model_path))
+    # print("SimVP model loaded from {}".format(sim_vp_model_path))
 
-    # Freeze all layers
-#     for param in model.parameters():
-#         param.requires_grad = False
     encoder_params = model.enc.parameters()
     hidden_params = model.hid.parameters()
 
@@ -105,8 +105,11 @@ if __name__ == "__main__":
     model.dec = Decoder(config["hid_S"], C,
                         config["N_S"], config["spatio_kernel_dec"])
     model.dec.readout = nn.Conv2d(config["hid_S"], num_classes, kernel_size=1)
-    print("SimVP model loaded from {}".format(sim_vp_model_path))
     print(f"Number of trainable parameters: {count_parameters(model)}")
+    resume_checkpoint = params["resume_checkpoint"]
+    model.load_state_dict(torch.load(resume_checkpoint))
+    print("SimVP model resumed from {}".format(sim_vp_model_path))
+
     decoder_params = model.dec.parameters()
 
     # Replace the final two layers of the model to output segmentation masks
@@ -114,13 +117,14 @@ if __name__ == "__main__":
     model = nn.DataParallel(model).to(
         device) if num_gpus > 1 else model.to(device)
 
-    class_weights = torch.ones(num_classes).to(device)
-    class_weights[0] = 0.4
-    criterion = nn.CrossEntropyLoss(ignore_index=255)  # For segmentation tasks
+    class_weights = torch.ones(params["num_classes"]).to(device)
+    class_weights[0] = 0.6
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights, ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     lr = params["ft_lr"]
-    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2},
-                                  {'params': hidden_params, 'lr': lr*1e-2},
+    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr},
+                                  {'params': hidden_params, 'lr': lr},
                                  {'params': decoder_params, 'lr': lr}])
 #     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #         optimizer, 'min', verbose=True)
@@ -130,9 +134,10 @@ if __name__ == "__main__":
     # Training loop
     num_epochs = params["ft_num_epochs"]
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=num_epochs//2, eta_min=1e-7, verbose=True)
+        optimizer, T_max=num_epochs//3, eta_min=1e-7, verbose=True)
 
     min_val_loss = float('inf')
+    max_jaccard = 0.0
 
     for epoch in range(num_epochs):
         model.train()
@@ -202,12 +207,12 @@ if __name__ == "__main__":
                 wandb.log({"val_loss_total": eval_loss,
                           "jaccard_score": jaccard_score})
 
-                if eval_loss < min_val_loss:
-                    min_val_loss = eval_loss
+                if jaccard_score > max_jaccard:
+                    max_jaccard = jaccard_score
                     torch.save(model.module.state_dict() if num_gpus > 1 else model.state_dict(
-                    ), f'./checkpoints/ft_simvp_segmentation_model_{epoch}.pth')
+                    ), f'./ft_checkpoints/ft_simvp_segmentation_model_{epoch}_{jaccard_score}.pth')
                     print(
-                        f"Model saved at epoch {epoch} with val loss: {min_val_loss}")
+                        f"Model saved at epoch {epoch} with val loss: {min_val_loss}. Jaccard score: {jaccard_score}")
 
     # Save the trained model
     # Access the inner model for saving

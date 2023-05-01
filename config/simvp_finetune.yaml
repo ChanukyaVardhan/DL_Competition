@@ -11,19 +11,21 @@ N_S: 4
 
 # training
 lr: 0.001
-batch_size: 8
-val_batch_size: 16
+batch_size: 4
+val_batch_size: 8
 drop_path: 0
-sched: 'ReduceLROnPlateau'
-val_batch_size: 16
+sched: 'CosineAnnealingLR'
 num_workers: 4
-data_root: /scratch/pj2251/DL/DL_Competition/data/Dataset_Student
+data_root: /vast/snm6477/DL_Finals/Dataset_Student
 distributed: false
-model_path: ./checkpoints/simvp_checkpoint.pth
+base_model_path: ./checkpoints/simvp_checkpoint.pth
+resume_checkpoint: ./ft_checkpoints/ft_simvp_segmentation_model_55_0.372.pth
+
 
 # Fine tuning
 num_classes: 49
 ft_lr: 0.001
-ft_num_epochs: 50
+ft_num_epochs: 100
 use_mask: true
 split_mask: true
+clean_videos: None
