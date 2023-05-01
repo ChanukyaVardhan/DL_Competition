@@ -28,3 +28,4 @@ ft_lr: 0.001
 ft_num_epochs: 100
 use_mask: true
 split_mask: true
+clean_videos: None

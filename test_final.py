@@ -1,8 +1,7 @@
+import matplotlib.colors as mcolors
 from collections import OrderedDict
 from PIL import Image
 import os
-import glob
-import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -12,13 +11,12 @@ from convttlstm.utils.convlstmnet import ConvLSTMNet
 from our_OpenSTL.openstl.models import SimVP_Model, Decoder
 from segmentation import SegNeXT
 import torchmetrics
-import wandb
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from utils import class_labels, get_unique_objects, apply_heuristics
 
+
 def plot_images(pred_mask, gt_mask, pred_image, image):
-    
 
     return wandb.Image(image, masks={
         "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
@@ -75,10 +73,11 @@ class TEST_Dataset(Dataset):
     def __getitem__(self, index):
         video_path = self.video_paths[index]
 
-        if self.split == "test":  # LOAD THE 11 FRAMES, AND RETURN 0's FOR OTHERS
+        if self.split == "hidden":  # LOAD THE 11 FRAMES, AND RETURN 0's FOR OTHERS
             frames = range(0, 11)
             target_images = torch.zeros(11, 3, 160, 240)
-            gt_mask = torch.zeros(11, 160, 240)
+            gt_mask = torch.tensor(
+                np.load(os.path.join(video_path, "mask.npy")))
         elif self.split == "train" or self.split == "val":  # LOAD ALL FRAMES AND THE MASK
             frames = range(0, 11)
             target_frames = range(11, 22)
@@ -90,7 +89,7 @@ class TEST_Dataset(Dataset):
             gt_mask = torch.zeros(11, 160, 240)
 
         input_images = self._load_images(video_path, frames)
-        if self.split != "test":
+        if self.split != "hidden":
             target_images = self._load_images(video_path, target_frames)
 
         _, video_name = os.path.split(video_path)
@@ -279,17 +278,11 @@ stacked_pred = []  # stacked predicted segmentation of predicted 22nd frame
 stacked_target = []
 stacked_gt = []  # stacked actual segmentation (only if train/val)
 
-# wandb.init(
-#         entity="dl_competition",
-#         config={"Total samples": 1000,
-#                 "batch_size": batch_size})
-
 unique_original_objects = []
 
-save_images = True # set to True to save images
+save_images = True  # set to True to save images
 
 colors = np.random.rand(49, 3)
-import matplotlib.colors as mcolors
 # Create a colormap from these colors
 cmap = mcolors.ListedColormap(colors)
 
@@ -297,44 +290,45 @@ with torch.no_grad():
     model.eval()
 
     for it, (_, input_images, target_images, gt_mask) in tqdm(enumerate(dataloader)):
-        input_images = input_images.cuda() #B, T, C, H, W
+        input_images = input_images.cuda()  # B, T, C, H, W
         target_images = target_images.cuda()
         input_img_masks = gt_mask[:, :11].cpu()
         gt_mask = gt_mask[:, -1]
 
-
         if (video_predictor != "ft_simvp"):
-            pred_mask, target_mask, pred_image = model(input_images, target_images)
+            pred_mask, target_mask, pred_image = model(
+                input_images, target_images)
         else:
             pred_mask = model(input_images)
             pred_mask = torch.argmax(pred_mask, dim=2)
-            pred_mask = pred_mask[:,-1, : , :]
+            pred_mask = pred_mask[:, -1, :, :]
 
         if save_images:
             for b in range(pred_mask.shape[0]):
-                hstacked = np.hstack([gt_mask[b].cpu().numpy(), pred_mask[b].cpu().numpy()])
+                hstacked = np.hstack(
+                    [gt_mask[b].cpu().numpy(), pred_mask[b].cpu().numpy()])
                 plt.imsave(f"./images/{it}_{b}.png", hstacked, cmap=cmap)
 
         # print(pred_mask.shape, target_images.shape, gt_mask.shape)
         unique_original_objects = unique_original_objects + get_unique_objects(
             input_img_masks.cpu().numpy())
-        
-        
+
         if (video_predictor != "ft_simvp"):
             # wandb images.
             w_masks, w_pred_img = plot_images(pred_mask.detach().cpu().numpy()[0],
-                        target_mask.detach().cpu().numpy()[0],
-                        pred_image.detach().cpu().numpy()[0].transpose(1, 2, 0),
-                        target_images.detach().cpu().numpy()[0][-1].transpose(1, 2, 0))
+                                              target_mask.detach().cpu().numpy()[
+                0],
+                pred_image.detach().cpu().numpy()[
+                0].transpose(1, 2, 0),
+                target_images.detach().cpu().numpy()[0][-1].transpose(1, 2, 0))
             # wandb.log({"Original image and gt + pred masks": w_masks, "Pred image": w_pred_img})
-        
+
         stacked_pred.append(pred_mask.cpu())
         if split != "test" and split != "unlabeled":
             if (video_predictor != "ft_simvp"):
                 stacked_target.append(target_mask.cpu())
             stacked_gt.append(gt_mask.cpu())
 
-    
     print("Number of Unique original objects: ", len(unique_original_objects))
     stacked_pred = torch.cat(stacked_pred, 0)
     print(f"Stacked Pred shape - {stacked_pred.shape}")
@@ -348,8 +342,9 @@ with torch.no_grad():
     if split != 'test':
         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
         jaccard_val = jaccard(stacked_pred, stacked_gt)
+        torch.save(stacked_pred, "stacked_pred_no_h.pt")
         fixed_stacked_pred = apply_heuristics(stacked_pred,
-                                               unique_original_objects, 'connected_components')
+                                              unique_original_objects, 'connected_components')
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
         print("Jaccard of predicted with gt: ", jaccard_val)
         print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
@@ -358,5 +353,3 @@ with torch.no_grad():
             print("Jaccard of original with gt: ", jaccard_val)
         jaccard_gt = jaccard(stacked_gt, stacked_gt)
         print("Jaccard of gt with gt: ", jaccard_gt)
-        
-# wandb.finish()

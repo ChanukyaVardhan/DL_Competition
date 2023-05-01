@@ -70,7 +70,8 @@ if __name__ == "__main__":
         # params["val_batch_size"] *= 2
 
     train_loader, val_loader, test_loader = load_data(
-        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], distributed=False, use_mask=params["use_mask"], split_mask=params["split_mask"])
+        "clevrer", params["batch_size"], params["val_batch_size"], params["num_workers"], params["data_root"], distributed=False,
+        use_mask=params["use_mask"], split_mask=params["split_mask"], clean_videos=params["clean_videos"])
 
     wandb.init(
         entity="dl_competition",
@@ -122,8 +123,8 @@ if __name__ == "__main__":
         weight=class_weights, ignore_index=255)  # For segmentation tasks
     # You might want to use a smaller learning rate for fine-tuning
     lr = params["ft_lr"]
-    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr*1e-2},
-                                  {'params': hidden_params, 'lr': lr*1e-2},
+    optimizer = torch.optim.Adam([{'params': encoder_params, 'lr': lr},
+                                  {'params': hidden_params, 'lr': lr},
                                  {'params': decoder_params, 'lr': lr}])
 #     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #         optimizer, 'min', verbose=True)
