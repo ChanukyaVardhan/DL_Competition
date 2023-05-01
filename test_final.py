@@ -348,6 +348,7 @@ with torch.no_grad():
     if split != 'test':
         jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
         jaccard_val = jaccard(stacked_pred, stacked_gt)
+        torch.save(stacked_pred, "stacked_pred_no_h.pt")
         fixed_stacked_pred = apply_heuristics(stacked_pred,
                                                unique_original_objects, 'connected_components')
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
