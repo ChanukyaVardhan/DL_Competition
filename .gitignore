@@ -38,3 +38,4 @@ wandb*
 # Greene files
 *.out
 *.err
+masks/
