@@ -69,8 +69,11 @@ def get_unique_objects(masks):
     return unique_objects
 
 # Same as above but returns an in in range [0, 48]
+
+
 def get_unique_objects_id(masks):
     return np.unique(masks).tolist()
+
 
 def apply_background_heuristic(S, uniq):
     random.seed(3)  # our team number
@@ -143,16 +146,24 @@ def get_closest_object(k, known_ids):
 
     return known_ids[priorities[0][1]]
 
-
+# First apply the heuristic for unknown.
+# Then apply the heuristic for known objects
+# FIX: Sort objects by areas and then apply heuristic?
 def apply_connected_components_heuristic(S, uniq):
+    area_threshold = 100  # FIX: Tune this
+    S = apply_connected_components_heuristic_internal(
+        S, uniq, area_threshold, False)
+    return apply_connected_components_heuristic_internal(S, uniq, area_threshold, True)
+
+
+def apply_connected_components_heuristic_internal(S, uniq, area_threshold, is_known):
     random.seed(3)  # our team number
     bad_cnt = 0
-    area_threshold = 100  # FIX: Tune this!
-    print("Running connected components heuristic with area threshold : ", area_threshold)
+    print("Running connected components heuristic with area threshold : ",
+          area_threshold, " and is_known : ", is_known)
     for i, obj in enumerate(uniq):  # Iterating over batch
         msk = S[i].clone()
         msk = msk.detach().cpu().numpy()
-        # print("msk shape : ", msk.shape)
         uniq_msk = np.unique(msk)
         good = True
         known_ids = [int(1 + C + 8*B + 16*A) for (A, B, C) in obj]
@@ -160,7 +171,7 @@ def apply_connected_components_heuristic(S, uniq):
         for k in uniq_msk:
             if k == 0:
                 continue
-            if k not in known_ids:  # Unknown object
+            if k not in known_ids and (not is_known):  # Unknown object
                 good = False
                 obj_area, neighbours = get_area_and_neighbours(
                     msk, k, known_ids)
@@ -176,7 +187,7 @@ def apply_connected_components_heuristic(S, uniq):
                     else:
                         obj_mapping[k] = get_closest_object(k, known_ids)
 
-            else:
+            elif k in known_ids and is_known:
                 obj_area, neighbours = get_area_and_neighbours(
                     msk, k, known_ids)
                 if obj_area < area_threshold:  # Small object
