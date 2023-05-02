@@ -16,6 +16,7 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 from utils import class_labels, get_unique_objects, apply_heuristics, class_labels_list
 from sklearn.metrics import confusion_matrix
+import wandb
 
 
 def plot_images(pred_mask, gt_mask, pred_image, image):
