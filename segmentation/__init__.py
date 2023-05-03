@@ -1,1 +1,0 @@
-from .segnext import SegNeXT
