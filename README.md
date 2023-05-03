@@ -15,7 +15,7 @@ Command to run :
 ```
 cd ./our_OpenSTL
 python tools/clevrer_train.py \
-    --epoch 200 \
+    --epoch 100 \
     --dataname "clevrer" \
     --data_root "../../../Dataset_Student" \
     --method "SimVP" \
