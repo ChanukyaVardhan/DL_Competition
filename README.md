@@ -1,8 +1,6 @@
-## DL_Competition
+# DL Competition
 
-# How to run SimVP
-
-Setup environment:
+## Setup environment:
 ```
 cd ./our_OpenSTL
 conda env create -f environment.yml
@@ -51,3 +49,19 @@ python tools/clevrer_train.py \
 --data_root : Where Dataset_Student lives
 
 --ex_name   : Name of the experiment. As of now, the model files will be saved in ./work_dirs/exp_name/
+
+
+
+# DeepLabv3
+## Training Deeplabv3
+
+```bash
+python train_deeplabv3.py
+```
+change ```data_dir``` in ```./config/segmentation_deeplabv3.yml``` to the path of the root dir where the train dataset is.
+
+## Running deeplabv3 on the hidde set
+```bash
+python label_with_deeplabv3.py
+```
+Run with the same config file as the one mentioned in train.
