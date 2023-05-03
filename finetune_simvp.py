@@ -17,7 +17,7 @@ from our_OpenSTL.openstl.datasets import load_data
 from our_OpenSTL.openstl.modules import ConvSC
 # from our_OpenSTL.openstl.api import BaseExperiment
 import torchmetrics
-from train_seg import get_parameters, eval_epoch
+from train_deeplabv3 import get_parameters
 from utils import class_labels, shapes, materials, colors
 from models import count_parameters
 
