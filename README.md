@@ -27,6 +27,7 @@ change the ```split``` variable to ```val```.
 
 
 ## Training SimVP 
+This is the self-supervised training.
 
 ```
 cd ./our_OpenSTL
@@ -50,6 +51,14 @@ python tools/clevrer_train.py \
 
 --ex_name   : Name of the experiment. As of now, the model files will be saved in ./work_dirs/exp_name/
 
+## Fine-tuning SimVP
+```bash
+python fine_tune_simvp.py --config_path ./config/simvp_finetune.yaml
+```
+Edit ```./config/simvp_finetune.yaml``` to change the path of the data directory.
+Here give ```base_model_path``` the path of trained SimVP model above to finetune the decoder using the train data.
+Give ```resume_checkpoint``` and ```use_mask``` boolean to resume training on the labelled hidden dataset.
+Use ```clean_videos``` to give path of the clean videos generated from the ```get_clean_videos.py``` script.
 
 
 # DeepLabv3
@@ -65,3 +74,8 @@ change ```data_dir``` in ```./config/segmentation_deeplabv3.yml``` to the path o
 python label_with_deeplabv3.py
 ```
 Run with the same config file as the one mentioned in train.
+
+# Cleaning videos
+```bash
+python get_clean_videos.py
+```

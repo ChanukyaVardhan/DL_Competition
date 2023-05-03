@@ -89,12 +89,13 @@ if __name__ == "__main__":
         "num_classes": params["num_classes"],
     }
     # exp = BaseExperiment(args)
-    sim_vp_model_path = params["base_model_path"]
     num_classes = params["num_classes"]
 
     model = SimVP_Model(**config)
-    # model.load_state_dict(torch.load(sim_vp_model_path))
-    # print("SimVP model loaded from {}".format(sim_vp_model_path))
+    if params["base_model_path"]:
+        sim_vp_model_path = params["base_model_path"]
+        model.load_state_dict(torch.load(sim_vp_model_path))
+        print("SimVP model loaded from {}".format(sim_vp_model_path))
 
     encoder_params = model.enc.parameters()
     hidden_params = model.hid.parameters()
@@ -108,7 +109,7 @@ if __name__ == "__main__":
     print(f"Number of trainable parameters: {count_parameters(model)}")
     resume_checkpoint = params["resume_checkpoint"]
     model.load_state_dict(torch.load(resume_checkpoint))
-    print("SimVP model resumed from {}".format(sim_vp_model_path))
+    print("SimVP model resumed from {}".format(resume_checkpoint))
 
     decoder_params = model.dec.parameters()
 
