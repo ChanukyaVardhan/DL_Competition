@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
-from convttlstm.utils.convlstmnet import ConvLSTMNet
 from our_OpenSTL.openstl.models import SimVP_Model, Decoder
 from segmentation import SegNeXT
 import torchmetrics
@@ -16,15 +15,6 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 from utils import class_labels, get_unique_objects, apply_heuristics, class_labels_list
 from sklearn.metrics import confusion_matrix
-import wandb
-
-
-def plot_images(pred_mask, gt_mask, pred_image, image):
-
-    return wandb.Image(image, masks={
-        "prediction": {"mask_data": pred_mask, "class_labels": class_labels},
-        "ground truth": {"mask_data": gt_mask, "class_labels": class_labels}
-    }), wandb.Image(pred_image)
 
 
 simvp_config = {
@@ -38,7 +28,7 @@ simvp_config = {
     "num_classes": 49,
 }
 
-save_images = True  # set to True to save images
+save_images = False  # set to True to save images
 if save_images:
     os.makedirs(f"./images/", exist_ok=True)
 
@@ -106,8 +96,8 @@ class TEST_Dataset(Dataset):
 
 
 class FINAL_Model(nn.Module):
-    def __init__(self, video_predictor="convttlstm", video_predictor_path="./checkpoints",
-                 segmentation="segnext", segmentation_path="./checkpoints",
+    def __init__(self, video_predictor="simvp", video_predictor_path="./checkpoints",
+                 segmentation="deeplabv3", segmentation_path="./checkpoints",
                  split="test"):
         super(FINAL_Model, self).__init__()
 
@@ -121,37 +111,7 @@ class FINAL_Model(nn.Module):
         self.normalize = transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
             0.0571, 0.0567, 0.0614])
 
-        if self.video_predictor == "convttlstm":
-            self.m1 = ConvLSTMNet(
-                input_channels=3,
-                output_sigmoid=False,
-                # model architecture
-                layers_per_block=(3, 3, 3, 3),
-                hidden_channels=(32, 48, 48, 32),
-                skip_stride=2,
-                # convolutional tensor-train layers
-                cell="convttlstm",
-                cell_params={
-                    "order": 3,
-                    "steps": 3,
-                    "ranks": 8},
-                # convolutional parameters
-                kernel_size=5)
-            # SINCE CONVTTLSTM MODEL WAS SAVED USING DDP, NEED TO REMVOE MODULE FORM KEYS.
-            # NEXT TIME SAVE MODEL.MODULE.SAVE_DICT() INSTEAD OF MODEL.SAVE_DICT() WHEN USING DDP.
-            state_dict = torch.load(
-                self.video_predictor_path, map_location='cpu')["model"]
-            new_state_dict = OrderedDict()
-            for k, v in state_dict.items():
-                name = k[7:]  # remove `module.`
-                new_state_dict[name] = v
-            # load params
-            self.m1.load_state_dict(new_state_dict)
-            # self.m1 = DDP(self.m1, device_ids = [0])
-            # self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cuda")["model"])
-            self.m1.eval()
-            print("Loaded convttlstm model!")
-        elif self.video_predictor == "simvp":
+        if self.video_predictor == "simvp":
             self.m1 = SimVP_Model(**simvp_config)
             # self.m1.load_state_dict(torch.load(self.video_predictor_path, map_location = "cpu")["state_dict"])
             self.m1.load_state_dict(torch.load(
@@ -161,13 +121,7 @@ class FINAL_Model(nn.Module):
         else:
             raise Exception("FIX THIS!")
 
-        if self.segmentation == "segnext":
-            self.seg = SegNeXT(49, weights=None)
-            self.seg.load_state_dict(torch.load(
-                self.segmentation_path, map_location='cpu')["model"])
-            self.seg.eval()
-            print(f"Loaded {self.segmentation} segmentation model!")
-        elif self.segmentation == "deeplabv3":
+        if self.segmentation == "deeplabv3":
             from torchvision.models.segmentation import deeplabv3_resnet50
             self.seg = deeplabv3_resnet50(
                 num_classes=49, weights_backbone=None)
@@ -180,12 +134,7 @@ class FINAL_Model(nn.Module):
 
     def forward(self, input_images, target_images):
         # input_images -> B, 11, 3, 160 ,240
-        if self.video_predictor == "convttlstm":
-            pred_images = self.m1(input_images,
-                                  input_frames=11, future_frames=11, output_frames=11, teacher_forcing=False)
-            pred_image = pred_images[:, -1]
-            target_image = target_images[:, -1]
-        elif self.video_predictor == "simvp":
+        if self.video_predictor == "simvp":
             pred_images = self.m1(input_images)
             pred_image = pred_images[:, -1]
             target_image = target_images[:, -1]
@@ -197,16 +146,7 @@ class FINAL_Model(nn.Module):
         else:
             raise Exception("FIX THIS!")
 
-        if self.segmentation == "segnext":
-            pred_mask = self.seg(pred_image)
-            pred_mask = torch.argmax(pred_mask, dim=1)
-            # WE CAN COMPUTE THE SEGMENTATION OUTPUT ONLY ON TRAIN/VAL VIDEOS
-            if self.split != "test" and self.split != "unlabeled":
-                target_mask = self.seg(target_image)
-                target_mask = torch.argmax(target_mask, dim=1)
-            else:
-                target_mask = None
-        elif self.segmentation == "deeplabv3":
+        if self.segmentation == "deeplabv3":
             pred_mask = self.seg(pred_image)['out']
             pred_mask = torch.argmax(pred_mask, dim=1)
             if self.split != "test" and self.split != "unlabeled":
@@ -271,31 +211,15 @@ num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
 
 data_dir = "/vast/snm6477/DL_Finals/Dataset_Student/"
 
-# video_predictor = "convttlstm"
-# video_predictor_path = "./checkpoints/convttlstm_best.pt"
 video_predictor = "ft_simvp"
-video_predictor_path = "./checkpoints/simvp_checkpoint_unnormalized.pth"
-video_predictor_path = "./checkpoints/simvp_checkpoint.pth"
 video_predictor_path = "./checkpoints/ft_simvp_segmentation_model_20.pth"
 segmentation = "deeplabv3"
-segmentation_path = "./checkpoints/segmentation_default_pretrain_model.pt"
 segmentation_path = "./checkpoints/deeplab_v3_segmentation_model_50.pth"
 
-if video_predictor == "convttlstm":
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
-                             0.0571, 0.0567, 0.0614])
-    ])
-elif "simvp" in video_predictor:
+if "simvp" in video_predictor:
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
-#     transform = transforms.Compose([
-#         transforms.ToTensor(),
-#         transforms.Normalize(mean=[0.5061, 0.5045, 0.5008], std=[
-#                              0.0571, 0.0567, 0.0614])
-#     ])
 else:
     raise Exception("FIX THIS!")
 
@@ -367,15 +291,6 @@ with torch.no_grad():
         # print(pred_mask.shape, target_images.shape, gt_mask.shape)
         unique_original_objects = unique_original_objects + get_unique_objects(
             input_img_masks.cpu().numpy())
-
-        if (video_predictor != "ft_simvp"):
-            # wandb images.
-            w_masks, w_pred_img = plot_images(pred_mask.detach().cpu().numpy()[0],
-                                              target_mask.detach().cpu().numpy()[
-                0],
-                pred_image.detach().cpu().numpy()[
-                0].transpose(1, 2, 0),
-                target_images.detach().cpu().numpy()[0][-1].transpose(1, 2, 0))
 
         stacked_pred.append(pred_mask.cpu())
         if split != "test" and split != "unlabeled":

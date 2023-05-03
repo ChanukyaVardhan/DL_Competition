@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
-from convttlstm.utils.convlstmnet import ConvLSTMNet
 from our_OpenSTL.openstl.models import SimVP_Model, Decoder
 from segmentation import SegNeXT
 import torchmetrics
@@ -26,6 +25,7 @@ simvp_config = {
     "num_classes": 49,
 }
 
+
 class TEST_Dataset(Dataset):
     def __init__(self, data_dir="./data", num_samples=0, transform=None, split='test'):
         self.data_dir = data_dir
@@ -38,7 +38,6 @@ class TEST_Dataset(Dataset):
         self.video_paths = [os.path.join(self.path, v) for v in os.listdir(
             self.path) if os.path.isdir(os.path.join(self.path, v))]
         self.video_paths.sort()
-
 
     def __len__(self):
         return len(self.video_paths) if self.num_samples == 0 else min(self.num_samples, len(self.video_paths))
@@ -142,8 +141,9 @@ with torch.no_grad():
 
     for it, (_, input_images, target_images, gt_mask) in tqdm(enumerate(dataloader)):
         input_images = input_images.cuda()  # B, T, C, H, W
-        target_images = target_images.cuda() # Zero for hidden
-        input_img_masks = gt_mask[:, :11].cpu() # Loaded from mask.npy, used for heuristics
+        target_images = target_images.cuda()  # Zero for hidden
+        # Loaded from mask.npy, used for heuristics
+        input_img_masks = gt_mask[:, :11].cpu()
         gt_mask = gt_mask[:, -1]
 
         pred_mask = model(input_images)
@@ -164,12 +164,12 @@ with torch.no_grad():
             stacked_gt.append(gt_mask.cpu())
 
     print("Number of Unique original objects: ", len(unique_original_objects))
-    # Sanity check :: 
+    # Sanity check ::
     print("Unique original objects[0]: ", unique_original_objects[0])
-    
+
     stacked_pred = torch.cat(stacked_pred, 0)
     print(f"Stacked Pred shape - {stacked_pred.shape}")
-    
+
     if split != "hidden" and split != "unlabeled":
         stacked_gt = torch.cat(stacked_gt, 0)
         print(f"Stacked GT shape - {stacked_gt.shape}")
@@ -193,7 +193,8 @@ with torch.no_grad():
         torch.save(stacked_pred, "stacked_pred_hidden.pt")
         print("Saved stacked_pred_hidden.pt of size : ", stacked_pred.shape)
         fixed_stacked_pred = apply_heuristics(stacked_pred,
-                                               unique_original_objects,
-                                                 'connected_components')
+                                              unique_original_objects,
+                                              'connected_components')
         torch.save(fixed_stacked_pred, "stacked_pred_hidden_heur.pt")
-        print("Saved stacked_pred_hidden_heur.pt of size : ", fixed_stacked_pred.shape)
+        print("Saved stacked_pred_hidden_heur.pt of size : ",
+              fixed_stacked_pred.shape)

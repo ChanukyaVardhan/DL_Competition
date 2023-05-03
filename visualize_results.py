@@ -75,6 +75,8 @@ print("Predictions: ", stacked_pred.shape)
 # Read all masks from the hidden data path
 video_masks = []
 for idx, video in tqdm(enumerate(os.listdir(hidden_data_path))):
+    if video != "video_15011":
+        continue
     prediction_mask = stacked_pred[idx]
     prediction_mask_heur = stacked_pred_heur[idx]
     pred_path = os.path.join(
