@@ -57,6 +57,7 @@ python fine_tune_simvp.py --config_path ./config/simvp_finetune.yaml
 ```
 Edit ```./config/simvp_finetune.yaml``` to change the path of the data directory.
 Here give ```base_model_path``` the path of trained SimVP model above to finetune the decoder using the train data.
+
 Give ```resume_checkpoint``` and ```use_mask``` boolean to resume training on the labelled hidden dataset.
 Use ```clean_videos``` to give path of the clean videos generated from the ```get_clean_videos.py``` script.
 
