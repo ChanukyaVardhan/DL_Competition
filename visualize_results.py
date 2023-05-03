@@ -32,28 +32,34 @@ def plot_images(prediction_mask1, prediction_mask2, save_path, class_indices1, c
 
     # Create a figure and axes
     # Adjust the figure size if needed
-    fig, axs = plt.subplots(1, 2, figsize=(20, 10))
+    with plt.style.context('dark_background'):
 
-    # Plot the first image
-    im1 = axs[0].imshow(prediction_mask1, cmap=cmap)
-    axs[0].set_title('Prediction Mask 1')
+        fig, axs = plt.subplots(2, 1, figsize=(10, 20))
 
-    # Plot the second image
-    im2 = axs[1].imshow(prediction_mask2, cmap=cmap)
-    axs[1].set_title('Prediction Mask 2')
+        # Plot the first image
+        im1 = axs[0].imshow(prediction_mask1, cmap=cmap)
+        axs[0].set_title('Prediction Mask')
 
-    # Add the colorbars to the images
-    # fig.colorbar(im1, ax=axs[0])
-    # fig.colorbar(im2, ax=axs[1])
+        # Plot the second image
+        im2 = axs[1].imshow(prediction_mask2, cmap=cmap)
+        axs[1].set_title('Prediction Mask After Heuristics')
 
-    # Add the legends to the corresponding subplots
-    axs[0].legend(handles=patches1, loc='best')
-    axs[1].legend(handles=patches2, loc='best')
+        # Add the colorbars to the images
+        # fig.colorbar(im1, ax=axs[0])
+        # fig.colorbar(im2, ax=axs[1])
 
-    # Save the image with the legend
-    plt.savefig(save_path)
+        # Add the legends to the corresponding subplots
+        axs[0].legend(handles=patches1, loc='best')
+        axs[1].legend(handles=patches2, loc='best')
 
-    plt.close()
+        # Adjust the space between the plots
+        # Adjust this value to get desired space
+        plt.subplots_adjust(hspace=0.2)
+
+        # Save the image with the legend
+        plt.savefig(save_path)
+
+        plt.close()
 
 
 hidden_data_path = "/mnt/d/Downloads/hidden_masks/hidden"
