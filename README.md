@@ -10,7 +10,25 @@ conda activate OpenSTL  # Or check if your env already has the requirements.
 python setup.py develop # This will create 'openstl' as a package
 ```
 
-Command to run : 
+## Running on the hidden set
+```bash
+python test_hidden.py
+```
+change the ```data_dir``` variable to the path of the root dir where the hidden dataset (hidden) folder exists.
+
+```stacked_pred_hidden_heur.pt``` is the output file.
+
+## Running on the validation set
+```bash
+python test_hidden.py
+```
+change the ```data_dir``` variable to the path of the root dir where the hidden dataset (hidden) folder exists.
+change the ```split``` variable to ```val```.
+
+```stacked_pred_hidden_heur.pt``` is the output file.
+
+
+## Training SimVP 
 
 ```
 cd ./our_OpenSTL

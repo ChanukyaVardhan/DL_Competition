@@ -9,7 +9,6 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
 from our_OpenSTL.openstl.models import SimVP_Model, Decoder
-from segmentation import SegNeXT
 import torchmetrics
 from tqdm import tqdm
 from matplotlib import pyplot as plt
@@ -212,7 +211,7 @@ num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
 data_dir = "/vast/snm6477/DL_Finals/Dataset_Student/"
 
 video_predictor = "ft_simvp"
-video_predictor_path = "./checkpoints/ft_simvp_segmentation_model_20.pth"
+video_predictor_path = "./ft_checkpoints/ft_simvp_segmentation_model_36_0.42.pth"
 segmentation = "deeplabv3"
 segmentation_path = "./checkpoints/deeplab_v3_segmentation_model_50.pth"
 

@@ -8,7 +8,6 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 import torchvision.transforms as transforms
 from our_OpenSTL.openstl.models import SimVP_Model, Decoder
-from segmentation import SegNeXT
 import torchmetrics
 from tqdm import tqdm
 from matplotlib import pyplot as plt
@@ -92,7 +91,7 @@ num_samples = 0  # 0 MEANS USE THE WHOLE DATASET
 data_dir = "/scratch/pj2251/DL/DL_Competition/data/Dataset_Student"
 
 video_predictor = "ft_simvp"
-video_predictor_path = "./ft_checkpoints/ft_simvp_segmentation_model_36_0.42003166675567627.pth"
+video_predictor_path = "./ft_checkpoints/ft_simvp_segmentation_model_36_0.42.pth"
 segmentation = "deeplabv3"
 segmentation_path = "./checkpoints/deeplab_v3_segmentation_model_50.pth"
 
@@ -183,6 +182,7 @@ with torch.no_grad():
         jaccard_val_h = jaccard(fixed_stacked_pred, stacked_gt)
         print("Jaccard of predicted with gt: ", jaccard_val)
         print("Jaccard of predicted with gt after heuristics: ", jaccard_val_h)
+        torch.save(fixed_stacked_pred, "stacked_pred_hidden_heur.pt")
         if (video_predictor != "ft_simvp"):
             jaccard_val = jaccard(stacked_target, stacked_gt)
             print("Jaccard of original with gt: ", jaccard_val)
